@@ -1,5 +1,3 @@
 [submodule "analysis/tools/egalito"]
 	path = analysis/tools/egalito
 	url = https://github.com/stevens-s3lab/egalito.git
-	branch = syspart
-

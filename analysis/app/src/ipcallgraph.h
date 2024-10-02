@@ -21,7 +21,7 @@ class IPCallGraphNode
 	map<address_t,int> nargs_icall; //From TypeArmor
 	map<address_t, bool> icallResolved;
 	map<tuple<address_t, IPCallGraphNode*>, bool> parentType;
-
+	std::set<Function*> atreturns;
 	public :
 
 		IPCallGraphNode(Function* f)
@@ -136,6 +136,17 @@ class IPCallGraphNode
 			return allATFunctions;
 		}
 		*/
+
+		void addATReturn(Function* atfunc)
+        	{
+                	atreturns.insert(atfunc);
+        	}
+
+        	set<Function*> getATReturn()
+        	{
+                	return atreturns;
+        	}
+
 };
 
 class IPCallGraph

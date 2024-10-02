@@ -86,7 +86,7 @@ class SyspartUtility
 		vector<Function*> prev_resolvedFns;
 		int iter=0;
 	private :
-		int analysisType; //0 when passed to find values of argument register
+		int analysisType; ////0 when passed to find values of argument register, 1 for indirect call target analysis, 2 for others
 		vector<Inter_result> found_results;
 		vector<Intra_result> found_state_results;
 		vector<tuple<string,address_t,int>> visitedFuncRegs;

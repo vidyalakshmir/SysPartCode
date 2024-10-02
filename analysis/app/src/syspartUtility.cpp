@@ -768,20 +768,74 @@ void SyspartUtility::findRegDef(Function* func, UDState *state, int reg, vector<
                 }
             }
         }
-    
-        if(!defFlag) 
-        {   
-            //cout<<"DFD ? (NO REGDEF) FUNC : "<<func->getName()<<std::hex<<" "<<instr->getAddress()<<" "<<std::dec<<reg<<endl;
-            InstrDumper instrDumper(instr->getAddress(), INT_MIN);
-            instr->getSemantic()->accept(&instrDumper);
-            //cout<<endl;
-            UDResult res {0, 0, "unknown", func};
-            if(find(result.begin(), result.end(), res) == result.end())
-            {
-                result.push_back(res);
-            }
-            //cout<<"DESC unknown "<<func->getName()<<" "<<reg<<" "<<std::hex<<instr->getAddress()<<endl;
-        }
+   	
+
+	if(!defFlag) 
+        {
+	    bool foundreturnAT = false;
+	    if(analysisType == 1)	//Only for indirect call analysis
+	    {
+		    state->dumpState();
+
+		    if(auto cfi = dynamic_cast<ControlFlowInstruction *>(instr->getSemantic()))
+		    {
+			    auto link = cfi->getLink();
+			    auto target = link->getTarget();
+			    if(auto func_target = dynamic_cast<Function *>(target))
+			    {
+				auto target_ipnode = ip_callgraph->getNode(func_target);
+				if(target_ipnode != NULL) 
+				{
+				auto returnvals = target_ipnode->getATReturn();
+				for(auto r : returnvals)
+				{
+					foundreturnAT = true;
+					std::stringstream sstream;
+                			sstream << "0x" << std::hex << r->getAddress();
+                			std::string new_str = sstream.str();
+                			UDResult res {1, r->getAddress(), new_str, func};
+                			result.push_back(res);
+
+				}
+				}
+			    }
+			    else if(auto plt = dynamic_cast<PLTTrampoline *>(target)) //Call to a library function called through PLt
+				{
+					if (auto ext_target = dynamic_cast<Function *>(plt->getTarget()))
+					{
+						auto target_ipnode = ip_callgraph->getNode(func_target);
+		                 		if(target_ipnode != NULL) {
+				 		auto returnvals = target_ipnode->getATReturn();
+
+						for(auto r : returnvals)
+						{
+							foundreturnAT = true;
+							std::stringstream sstream;
+        					        sstream << "0x" << std::hex << r->getAddress();
+					                std::string new_str = sstream.str();
+					                UDResult res {1, r->getAddress(), new_str, func};
+					                result.push_back(res);
+						}
+						}
+					}
+				}
+
+		    }
+	    }	    
+	    if(!foundreturnAT)
+	    {
+            	//cout<<"DFD ? (NO REGDEF) FUNC : "<<func->getName()<<std::hex<<" "<<instr->getAddress()<<" "<<std::dec<<reg<<endl;
+            	InstrDumper instrDumper(instr->getAddress(), INT_MIN);
+            	instr->getSemantic()->accept(&instrDumper);
+           	//cout<<endl;
+            	UDResult res {0, 0, "unknown", func};
+            	if(find(result.begin(), result.end(), res) == result.end())
+            	{
+                	result.push_back(res);
+            	}
+            	//cout<<"DESC unknown "<<func->getName()<<" "<<reg<<" "<<std::hex<<instr->getAddress()<<endl;
+	    }
+        } 
 
     } while(!pending.empty());
     //vs.clear();

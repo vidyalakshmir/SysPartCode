@@ -1166,13 +1166,59 @@ bool IPCallGraph::searchDownDef(UDState* state, int reg1, Function* atfunc)
     tuple<Instruction*,int> tup1(state->getInstruction(),reg1);
 	visited_states.insert(tup1);
     auto instr = state->getInstruction();
+    auto cur_func = (Function*)instr->getParent()->getParent();
     if(dynamic_cast<ReturnInstruction *>(instr->getSemantic())) //DF ends in a return statement
     {
-    	if(reg1 == 0) //RAX
+	    	if(reg1 == 0) //RAX
     	{
-    		return false;
+		bool flag = true;
+		//cout<<"FDF ENDS_IN_RETURN "<<atfunc->getName()<<" "<<cur_func->getName()<<endl;
+		auto ipnode = getNode(cur_func);
+		ipnode->addATReturn(atfunc);
+		if(ipnode != NULL)
+	        {
+			auto p = ipnode->getParentWithType();
+			for(auto pp : p)
+			{
+				address_t paddr;
+				IPCallGraphNode* pnode;
+				tie(paddr, pnode) = pp.first;
+				auto pfunc = pnode->getFunction();
+				bool ptype = pp.second;
+				if(ptype == false)
+					continue;
+				Instruction* pinstr = NULL;
+				for(auto bl : CIter::children(pfunc))
+				{
+					for(auto instr : CIter::children(bl))
+					{
+						if(instr->getAddress() == paddr)
+						{
+							pinstr = instr;
+							break;
+						}
+					}
+				}
+				auto pgraph = new ControlFlowGraph(pfunc);
+				auto pconfig = new UDConfiguration(pgraph);
+			        auto pworking = new UDRegMemWorkingSet(pfunc, pgraph);
+				auto pusedef =  new UseDef(pconfig, pworking);
+			        SccOrder order(pgraph);
+			        order.genFull(0);
+			        pusedef->analyze(order.get());
+    	                        auto pstate = pworking->getState(pinstr);
+				auto tempflag = searchDownDef(pstate, reg1, atfunc);
+                                //cout<<cur_func->getName()<<" invoked from "<<pfunc->getName()<<" "<<tempflag<<endl;
+				flag = flag & tempflag;
+			}
+		}
+    		return flag;
     	}
-        return true;
+	else
+	{
+		//cout<<"FDF NO_USE_END_OF_FUNC "<<atfunc->getName()<<" "<<cur_func->getName()<<endl;
+        	return true;
+	}
     }
     else if(auto ici =  dynamic_cast<IndirectCallInstruction *>(instr->getSemantic())) //DF ends in an indirect call
     {

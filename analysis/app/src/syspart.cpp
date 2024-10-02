@@ -119,7 +119,7 @@ void Syspart::findDirectSyscallsOfModule(Module* m)
             auto syscallValues = kv.second;
             for(auto value : syscallValues)
             {
-                cout<<f->getName()<<" "<<value<<"\n";
+		cout<<f->getName()<<" "<<m->getName()<<" " <<system_calls[value]<<" "<<value<<"\n";
             }
         }
     }

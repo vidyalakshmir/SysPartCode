@@ -1254,6 +1254,23 @@ bool IPCallGraph::searchDownDef(UDState* state, int reg1, Function* atfunc)
         }
         
     }
+    else if(auto iji =  dynamic_cast<IndirectJumpInstruction *>(instr->getSemantic())) //DF ends in an indirect jump tail call recursion
+    {
+
+        if(!iji->isForJumpTable())
+	{
+		if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to indirect call?
+        	{
+            		return false;
+        	}
+        	else                                            //Flowing into an indirect call. Adding as an edge at this indirect call
+        	{
+                	addEdge(instr->getAddress(), (Function*)instr->getParent()->getParent(), atfunc, false);
+                	return true;
+        	}
+	}
+
+    }
     else if(dynamic_cast<DataLinkedControlFlowInstruction *>(instr->getSemantic())) 
     {
         if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to data link instruction

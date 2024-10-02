@@ -117,5 +117,7 @@ class Syspart
 		void printAICT(bool icanalysisFlag, bool typearmorFlag);	//Average Indirect Call Target
 		void getSyscallsFromDlsym(bool direct, bool icanalysisFlag, bool typearmorFlag, string file_name);
 		int getNoReturnFnCount();
+		void printFunctions();
+		void printDlArgs(string dlname);
 };
 #endif

@@ -107,7 +107,10 @@ int main(int argc, char *argv[])
       16. Print direct system calls of module (args : modulename) \n \
       17. Prints the callgraph of a module (args : modulename) \n \
       18. Prints the number of instructions in a function (args : functionname) \n \
-      19. Prints if fork() and pthread() functions are invoked within the application"},
+      19. Prints if fork() and pthread() functions are invoked within the application \n \
+      20. Print all functions of all modules \n \
+      21. Prints the arguments to dlopen()  \n \
+      22. Prints the arguments to dlsym()" },
       { 0 } 
     }; 
     struct argp argp = { options, parse_opt }; 
@@ -460,6 +463,21 @@ int main(int argc, char *argv[])
                 sp.run6(direct_flag, icanalysisFlag, typearmorFlag);                    
                 break;
             }
+	case 20 :
+	    {
+		sp.printFunctions();
+		break;
+	    }
+	case 21 :
+	    {
+		    sp.printDlArgs("dlopen@");
+		    break;
+	    }
+	case 22 :
+	    {
+		    sp.printDlArgs("dlsym@");
+		    break;
+	    }
         default : {
                     cout<<"\nInvalid option"<<endl;
                     break;

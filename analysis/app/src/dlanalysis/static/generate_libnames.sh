@@ -1,17 +1,17 @@
 #!/bin/bash
 app=$1
 script_dir=$(dirname "$0")
-pathfile="$script_dir/../pathlist_$app.txt"
-file1="$script_dir/../all_libs_$app.txt"
+pathfile="$script_dir/../pathlist.txt"
+file1="$script_dir/../all_libs.txt"
 rm -f $file1
 while IFS= read -r line
 do
-		sudo find $line | grep '\.so$' >> $file1
+	sudo find $line | grep '\.so$' >> $file1
 done < "$pathfile"
 
 
 
-file2="$script_dir/../unique_libs_$app.txt"
+file2="$script_dir/../unique_libs.txt"
 rm -f $file2
 declare -A fnames
 i=0

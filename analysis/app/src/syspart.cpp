@@ -2197,6 +2197,12 @@ void Syspart::printAllSections()
 
 void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string function, int reg, char* filename)
 {
+    auto func = findFunctionByName(function);
+    if(func == NULL)
+    {
+	    cout<<"Function with name "<<function<<" not found"<<endl;
+	    return;
+    }
     ip_callgraph.setProgram(program);
     ip_callgraph.setRoot(start_func);
     ip_callgraph.resolveNss(setup);
@@ -2208,22 +2214,46 @@ void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string f
     ip_callgraph.addNssEdges();
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
-    for(auto module : CIter::children(program))
-        {
-            for(auto func : CIter::functions(module))
-            {
-                auto fname = func->getName();
-                if(fname == function)
-                {
-                    vector<UDResult> res;
-                    util.getArgumentsPassedToFunction(func, reg , res);
-                  
-                }                        
-                         
-            }
-        }   
-    
-    
+    vector<UDResult> res;
+    util.getArgumentsPassedToFunction(func, reg , res);
+}
+
+void Syspart::printDlArgs(string dlname)
+{
+	Function* func = NULL;
+	bool found = false;
+	auto module_libc = program->getLibc();
+	for(auto f : CIter::functions(module_libc))
+	{
+		auto fname = f->getName();
+		if (fname.find(dlname) == 0)
+		{
+			cout<<fname<<" found "<<endl;
+			found = true;
+			func = f;
+			break;
+		}
+	}
+	if(!found)
+	{
+		cout<<"Function "<<dlname<<" not found"<<endl;
+		return;
+	}
+	ip_callgraph.setProgram(program);
+    	ip_callgraph.setRoot(start_func);
+    	ip_callgraph.setIcanalysis(true);
+    	ip_callgraph.generate();
+    	finiFuncs = ip_callgraph.getFiniFuncs();
+    	initFuncs = ip_callgraph.getInitFuncs();
+    	SyspartUtility util(program, &ip_callgraph, 0);
+    	util.initialize();
+    	vector<UDResult> res;
+	int reg;
+	if(dlname == "dlopen")
+		reg = 7;
+	else if(dlname == "dlsym")
+		reg = 6;
+    	util.getArgumentsPassedToFunction(func, reg , res);
 }
 
 
@@ -2663,5 +2693,16 @@ int Syspart::getNoReturnFnCount()
         }
     }
     return count;
+}
+
+void Syspart::printFunctions()
+{
+	for(auto module : CIter::children(program))
+	{
+		for(auto func : CIter::functions(module))
+		{
+			cout<<func->getName()<<" "<<std::hex<<func->getAddress()<<" "<<module->getName()<<endl;
+		}
+	}
 }
 

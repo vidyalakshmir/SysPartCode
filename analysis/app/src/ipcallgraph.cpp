@@ -858,6 +858,27 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 			else //Not an indirect call instruction, but can be datalinked instruction or an indirect jump instruction
 			{
 				nicalls++;
+				if(icanalysisFlag)
+                                {
+                                        if(n->isIcallResolved(addr))
+                                        {
+                                                resolvedIcalls++;
+                                                auto inc = n->getIndirectChildren();
+						for(auto i : inc)
+                                                {
+                                                        if(i.first != addr)
+                                                                continue;
+                                                        for(auto ict : i.second)
+                                                        {
+                                                                totResolvedIcTarget++;
+                                                        }
+
+                                                }
+                                                continue;
+                                        }
+
+                                }
+	
 				n->setIcallResolved(addr, false);
 				if(!typeArmorFlag)							//If TypeArmor not enabled
 				{

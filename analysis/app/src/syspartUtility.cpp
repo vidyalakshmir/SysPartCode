@@ -884,8 +884,19 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
         for(auto instruction : CIter::children(block)) {
             auto semantic = instruction->getSemantic();
             auto state = working->getState(instruction);
-            
-            if(auto ici = dynamic_cast<IndirectCallInstruction *>(semantic)) {
+
+	    auto ici = dynamic_cast<IndirectCallInstruction *>(semantic);
+	    auto iji = dynamic_cast<IndirectJumpInstruction *>(semantic);
+	    
+	    if(iji)
+	    {
+		if(iji->isForJumpTable())
+		{
+			continue;
+		}
+	    }
+
+	    if(ici || iji) {	    
                 //cout<<"Enter"<<endl;
                 //int c = getchar();
                 vector<IndirectCallTarget> icTargets;
@@ -932,12 +943,13 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                     continue;
                 if(n->isIcallResolved(instruction->getAddress()))
                     continue;
-                ici->clearAllTargets();
+                if(ici)
+			ici->clearAllTargets();
                 InstrDumper instrDumper(instruction->getAddress(), INT_MIN);
                 instruction->getSemantic()->accept(&instrDumper);
 
                 stack_depth = 0;
-                if(ici->hasMemoryOperand()) 
+                if(ici && ici->hasMemoryOperand()) 
                 {
                     IndirectCallTarget target(instruction->getAddress());
                     target.setUnknown();
@@ -946,7 +958,16 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                 }
                 else 
                 {
-                    auto reg = X86Register::convertToPhysical(ici->getRegister());
+		    int reg;
+		    if(ici)
+		    {
+                    	reg = X86Register::convertToPhysical(ici->getRegister());
+		    }
+		    else if(iji)
+		    {
+			reg = X86Register::convertToPhysical(iji->getRegister());
+		    }
+
                     DisasmHandle handle(true);
 
                     vector<UDResult> results;
@@ -1003,7 +1024,7 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                                 {
                                     target.setName(func_name);
                                 }
-                                else 
+                                else if(r.addr != 0)
                                 {
                                     target.setGlobal();
                                 }

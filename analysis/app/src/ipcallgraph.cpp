@@ -875,6 +875,43 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 	}
 } 
 
+void IPCallGraph::printCallGraphWithCallsites()
+{
+        for(auto n: nodeMap)
+        {
+                auto node = n.second;
+                auto mod = (n.first)->getParent()->getParent()->getName();
+                for(auto c : node->getDirectChildren())
+                {
+                        auto offset = c.first - (n.first)->getAddress();
+                        for(auto nn : c.second)
+                        {
+                                cout<<"DIRECT "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                        }
+                }
+                for(auto c :node->getIndirectChildren())
+                {
+
+                        if(node->isIcallResolved(c.first))
+                        {
+				cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
+                                for(auto nn : c.second)
+                                {
+                                        cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                                }
+                        }
+                        else
+                        {
+			cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
+                        for(auto nn : c.second)
+                        {
+                                cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                        }
+                        }
+                }
+        }
+}
+
 void IPCallGraph::pruneIndirectEdges(IPCallGraphNode* node)
 {
 	

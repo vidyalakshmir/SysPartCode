@@ -251,7 +251,7 @@ class IPCallGraph
 	void generateDirectCallGraph();
 	void printCallGraph();
 	void printCallGraphofApplication();
-
+	void printCallGraphWithCallsites();
 	void printIndirectEdges();
 	void printDirectEdges();
 	bool forwardDataFlow(Function* f, Instruction* instr, Function* atfunc);

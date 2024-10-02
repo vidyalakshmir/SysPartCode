@@ -1344,7 +1344,8 @@ void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
     ip_callgraph.addNssEdges();
     finiFuncs = ip_callgraph.getFiniFuncs();
     initFuncs = ip_callgraph.getInitFuncs();
-    ip_callgraph.printCallGraph();
+    ip_callgraph.printCallGraphWithCallsites();
+    //ip_callgraph.printCallGraph();
     //ip_callgraph.printCallGraphofApplication();
     //ip_callgraph.printDirectEdges();
       

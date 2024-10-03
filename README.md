@@ -111,7 +111,7 @@ In the environment we tested (Ubuntu 18.04 and libc-2.27), the dlopen and dlsym 
  This script will produce two files `fninter_dlopen.txt` and `fninterp_dlsym.txt` in the `$OUTPUT_FOLDER` and they will contains the arguments to `dlopen()` and `dlsym()` functions respectively. It also moves `fninterp_$pid.txt` files from `output/` to `$OUTPUT_FOLDER`.
 
 
- `
+ 
 
 ### Serving Phase Detection
 

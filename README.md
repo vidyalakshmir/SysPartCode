@@ -70,7 +70,7 @@ By default all indirect calls target the AT functions.
 `-i` performs the FCG refining of SysPart (prune AT list and resolve indirect calls).
 For more options, refer `./syspart --help`
 
-###Dynamic Library Profiling
+### Dynamic Library Profiling
 The names of libraries and functions loaded using dlopen() and dlsym() are determined by a combination of static and dynamic libraries.
 
 

@@ -10,7 +10,7 @@ void __attribute__((constructor)) init()
 {
     char filename[100];
     pid_t pid = getpid();
-    sprintf(filename, "output/fn_interp/fninterp_%d.txt",pid);
+    sprintf(filename, "output/fninterp_%d.txt",pid);
     fp1 = fopen(filename,"a"); 
 }
        

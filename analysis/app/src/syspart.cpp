@@ -2206,13 +2206,13 @@ void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string f
     }
     ip_callgraph.setProgram(program);
     ip_callgraph.setRoot(start_func);
-    ip_callgraph.resolveNss(setup);
+    //ip_callgraph.resolveNss(setup);
     ip_callgraph.setIcanalysis(icanalysisFlag);
     ip_callgraph.setTypeArmor(typearmorFlag);
     ip_callgraph.generate();
     finiFuncs = ip_callgraph.getFiniFuncs();
     initFuncs = ip_callgraph.getInitFuncs();
-    ip_callgraph.addNssEdges();
+    //ip_callgraph.addNssEdges();
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
     vector<UDResult> res;

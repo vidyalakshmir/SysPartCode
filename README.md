@@ -71,51 +71,51 @@ By default all indirect calls target the AT functions.
 For more options, refer `./syspart --help`
 
 ### Dynamic Library Profiling
-The names of libraries and functions loaded using dlopen() and dlsym() are determined by a combination of static and dynamic libraries.
+The names of libraries and functions loaded using dlopen() and dlsym() are determined by a combination of static and dynamic analyses.
 
 
-##### Determine the dlopen and dlsym function name
+#### Determine the dlopen and dlsym function name
 
-In the environment we tested (Ubuntu 18.04 and libc-2.27), the dlopen() and dlsym() is in libdl.so and its names are dlopen@@GLIBC_2.2.5 and dlsym. Please check and confirm this in the environment that you are using. And update `analysis/app/src/dlanalysis/dlopen.txt` with the corresponding dlopen function name and `analysis/app/src/dlanalysis/dlsym.txt` with the corresponding dlsym function name.
+In the environment we tested (Ubuntu 18.04 and libc-2.27), the dlopen and dlsym functions are in libdl.so and its names are `dlopen@@GLIBC_2.2.5` and `dlsym`. Please check and confirm this in the environment that you are using and update `analysis/app/src/dlanalysis/dlopen.txt` with the corresponding dlopen function name and `analysis/app/src/dlanalysis/dlsym.txt` with the corresponding dlsym function name.
 
-##### Static analysis
- `
+#### Static analysis
+ ```
  cd analysis/app/src/dlanalysis/static
  ./run_dlanalysis.sh $BINARY $OUTPUT_DIR
- `
+ ```
  where $BINARY is the name of the binary and $OUTPUT_DIR is the output folder in which the output files will be stored.
  
  This script runs SysPart's static analysis using value-flow analysis (VFA) and the results are stored in `dlopen_static.txt` and `dlsym_static.txt`. Each line of these files contain the function which invokes dlopen/dlsym along with the callsite address followed by the argument passed to dlopen/dlsym. In case of dlopen(), the first argument, which represents the shared library name is found. In case of dlsym(), the second argument, which represents the function to which a pointer is requested, is found.
 
- In case where all possible values flowing into dlsym() call sites are resolved, but not to dlopen(), we use heuristics and search the system for libraries exporting any of the resolved symbols. All matching libraries are potential inputs to dlopen() and this list can be seen in `libraries_matching_syms.txt` in the output folder. By default, all libraries found in the paths mentioned in the file `analysis/app/src/dlanalysis/pathlist.txt` are considered to do this search. It is recommended to add application-specific folders to this path as dependent libraries might reside in those paths.
+ In case where all possible values flowing into dlsym() call sites are resolved, but not to dlopen(), we use heuristics and search the system for libraries exporting any of the resolved symbols. All matching libraries are potential inputs to dlopen() and this list can be seen in `libraries_matching_syms.txt` in the output folder. By default, all libraries found in the paths mentioned in the file `analysis/app/src/dlanalysis/pathlist.txt` are considered to do this search. It is recommended to add application-specific folders to this the file as dependent libraries might reside in those paths.
 
 
- ##### Dynamic analysis
+ #### Dynamic analysis
  For verification purposes, we employ dynamic analysis to get the arguments to dlopen and dlsym seen at runtime.
 
- `
+ ```
  cd analysis/app/src/dlanalysis/dynamic/fninterposition
  make
  LD_PRELOAD=./libmydl.so $APP_RUN_COMMAND
- `
+ ```
 `APP_RUN_COMMAND` refers to the command to run the application. If the application requires root permissions, run with sudo.
  
  `sudo LD_PRELOAD=./libmydl.so $APP_RUN_COMMAND`
 
- The results of the run are stored as `output/fninterp_$pid.txt` where `$pid`  is the process id.
+ The results of the run are stored in `output/fninterp_$pid.txt` where `$pid`  is the process id.
 
- To process the results of the file, run
+ To process the results, run
 
  `./process_output.sh output/ $OUTPUT_FOLDER`
 
- This script will produce two files `fninter_dlopen.txt` and `fninterp_dlsym.txt` in the `$OUTPUT_FOLDER` which contains the arguments to `dlopen()` and `dlsym()` functions. It also moves `fninterp_$pid.txt` files from `output/` to `$OUTPUT_FOLDER`.
+ This script will produce two files `fninter_dlopen.txt` and `fninterp_dlsym.txt` in the `$OUTPUT_FOLDER` and they will contains the arguments to `dlopen()` and `dlsym()` functions respectively. It also moves `fninterp_$pid.txt` files from `output/` to `$OUTPUT_FOLDER`.
 
 
  `
 
-#Serving Phase Detection
+### Serving Phase Detection
 
-#System calls of main() and mainloop
+### System calls of main() and mainloop
 
 
-#System Call Enforcement
+### System Call Enforcement

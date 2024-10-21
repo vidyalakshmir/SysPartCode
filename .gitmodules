@@ -1,4 +1,4 @@
 [submodule "analysis/tools/egalito"]
 	path = analysis/tools/egalito
 	url = git@gitlab.com:fthdrmzzz/egalito.git
-	branch = libsec-tool
+	branch = libsec-tool-fixing

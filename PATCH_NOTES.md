@@ -33,6 +33,17 @@ I have changed submodule links from relative links to urls to be able to pull th
 +	url = https://gitlab.com/Egalito/egalito-docs.git
 ```
 ---
+### Applying Changes of Vidya
+
+I have simply applied the changes of Vidya on egalito on this branch. I have checked changes hunk by hunk and I didn't notice a conflicting or breaking change. Egalito and Syspart eventually built and worked properly after applying this patch.
+```sh
+wget https://github.com/columbia/egalito/compare/master...stevens-s3lab:egalito:syspart-updated.diff -O changes_of_vidya.diff
+git apply --reject --whitespace=fix ../changes_of_vidya.diff
+git add -p
+```
+
+
+---
 ### Installing Dependencies & Building
 
 In `metis-main`, branch, they have removed capstone and gtirb submodules.  

@@ -1,13 +1,18 @@
 # SyspartCode
 
 
-This repository contains the source code of "SYSPART: Automated Temporal System Call Filtering for Binaries", published in ACM Conference on Computer and Communications Security (CCS) 2023. (https://dl.acm.org/doi/10.1145/3576915.3623207). We update this repository to add more features and fix bugs.
+This repository contains the source code of "SYSPART: Automated Temporal System Call Filtering for Binaries", published in ACM Conference on Computer and Communications Security (CCS) 2023. (https://dl.acm.org/doi/10.1145/3576915.3623207). The purpose of this repository to run and explore the different functionalities offered by the tool. If you are looking to reproduce the results of the paper, please refer to this repository https://github.com/vidyalakshmir/SysPartArtifact.
+
+
+We update this repository to add more features and fix bugs. In case of any queries or issues, please contact vrajagop@stevens.edu.
+
+
 
 
 ## Basic Requirements
 - Works on **linux binaries (ELF)** which run on **x86-64** architecture
 - Tested with **ELF binaries with symbols** (application as well as libraries). It will work with stripped binaries, only that the results (like callgraph) might be overapproximated.
-- The tool is tested on **Ubuntu 18.04**. Updating to latest linux versions might require some tweaks/changes
+- The tool is tested on **Ubuntu 18.04**. Updating to latest linux versions might require some tweaks/changes. (We are working on updating to the latest linux versions. Stay tuned.)
 
 
 ## Capabilities of the tool

@@ -3,3 +3,7 @@ analysis/app/.symlinks
 analysis/app/build_x86_64/
 analysis/app/loops
 analysis/app/syspart
+*.swp
+tags
+*.out
+test/*txt

@@ -6,4 +6,4 @@ analysis/app/syspart
 *.swp
 tags
 *.out
-test/*txt
+test/**/*.txt

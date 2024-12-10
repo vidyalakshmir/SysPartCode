@@ -18,5 +18,8 @@ helloDynamic/main: helloDynamic/main.cpp
 	$(CXX) $(CXXFLAGS) helloDynamic/main.cpp -o helloDynamic/main -ldl
 
 clean:
-	rm -f hello/*.o hello/*.so hello/main helloIndirect/main helloDynamic/main
+	rm -f hello/*.o hello/*.so hello/main \
+		helloIndirect/main helloDynamic/main helloDynamic/*.txt \
+			hello*/*.so
+
 

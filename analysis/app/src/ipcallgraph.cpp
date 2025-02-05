@@ -915,7 +915,7 @@ void IPCallGraph::printCallGraphWithCallsites()
 
                         if(node->isIcallResolved(c.first))
                         {
-				cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
+				//cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                                 for(auto nn : c.second)
                                 {
                                         cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
@@ -923,7 +923,7 @@ void IPCallGraph::printCallGraphWithCallsites()
                         }
                         else
                         {
-			cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
+			//cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                         for(auto nn : c.second)
                         {
                                 cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;

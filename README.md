@@ -7,7 +7,8 @@ This repository contains the source code of "SYSPART: Automated Temporal System 
 We update this repository to add more features and fix bugs. In case of any queries or issues, please contact vrajagop@stevens.edu.
 
 
-
+## Upgrades and fixes
+We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the [section](#run-in-latest-oS-versions)
 
 ## Basic Requirements
 - Works on **linux binaries (ELF)** which run on **x86-64** architecture
@@ -44,6 +45,13 @@ Once you ensure your public  keys are configured, you an clone the repository re
 
 ```
 git clone --recursive https://github.com/vidyalakshmir/SysPartCode.git
+```
+
+#### Run in latest OS versions
+The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04. Please issue the following commands for the upgrade
+```
+cd SysPartCode/analysis/tools/egalito
+git checkout egalito-upgrade
 ```
 
 ### Install all dependencies

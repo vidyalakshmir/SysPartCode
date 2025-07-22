@@ -1382,20 +1382,31 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
             if(sys_node == NULL)
                     cout<<"No system calls generated for "<<f->getName()<<endl;
             auto tot_syscalls = getSyscalls(sys_node);
-	    cout<<"SYSCALLS [";
             for(auto t : tot_syscalls)
                 {
-                        cout<<system_calls[t]<<",";
+                        cout<<system_calls[t]<<endl;
                 }
-	    cout<<"]"<<endl;
-	    cout<<"SIZE "<<tot_syscalls.size()<<endl;
         }
     }
     else
     {
         for(auto f : ip_callgraph.nodeMap)
         {
-            getSyscallInfo(f.first);
+	    auto sys_node = getSysNode(f.first);
+	    if(sys_node == NULL)
+		continue;
+	    auto tot_syscalls = getSyscalls(sys_node);
+	    cout<<"Syscalls of "<<(f.first)->getName()<<" : "<<endl;
+	    cout<<"--------------------------------------------"<<endl;
+	    for(auto t : tot_syscalls)
+	    {
+	    	cout<<system_calls[t]<<" ";
+	    }
+	    if(tot_syscalls.size() == 0)
+		cout<<"NO SYSCALLS";
+	    cout<<endl;
+	    cout<<endl;
+	    cout<<endl;
         }
     }
 }

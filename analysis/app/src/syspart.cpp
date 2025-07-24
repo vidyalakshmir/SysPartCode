@@ -1369,7 +1369,6 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
   
     findDirectSyscalls();
     findDerivedSyscalls(start_func);
-    //cout<<"Syscall generation DONE"<<endl;
     
     if(func_name != "*")
     {
@@ -1377,10 +1376,12 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
         if(f != NULL)
         {
 	    
-            //getSyscallInfo(f);
             auto sys_node = getSysNode(f);
             if(sys_node == NULL)
+	    {
                     cout<<"No system calls generated for "<<f->getName()<<endl;
+		    return;
+	    }
             auto tot_syscalls = getSyscalls(sys_node);
             for(auto t : tot_syscalls)
                 {
@@ -1390,24 +1391,82 @@ void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string 
     }
     else
     {
-        for(auto f : ip_callgraph.nodeMap)
-        {
-	    auto sys_node = getSysNode(f.first);
-	    if(sys_node == NULL)
-		continue;
-	    auto tot_syscalls = getSyscalls(sys_node);
-	    cout<<"Syscalls of "<<(f.first)->getName()<<" : "<<endl;
-	    cout<<"--------------------------------------------"<<endl;
-	    for(auto t : tot_syscalls)
-	    {
-	    	cout<<system_calls[t]<<" ";
-	    }
-	    if(tot_syscalls.size() == 0)
-		cout<<"NO SYSCALLS";
-	    cout<<endl;
-	    cout<<endl;
-	    cout<<endl;
-        }
+	int msize=0;
+	std::map<Module*,int> mod_func_count;
+	for(auto mod : CIter::children(program))
+	{
+		msize++;
+		int count=0;
+		for(auto f : CIter::functions(mod))
+		{
+                        if(getSysNode(f) == NULL)
+                                continue;
+
+			count++;
+		}
+		mod_func_count[mod] = count;
+	}
+	cout << "{\n";
+	int fcount=1, mcount=1;
+	for(auto mod : CIter::children(program))
+	{
+		auto fsize = mod_func_count[mod];
+
+		std::cout << "  \"" << mod->getName()  << "\": {\n";
+		fcount=1;
+		for(auto f : CIter::functions(mod))
+		{
+			auto func_name = f->getName();
+			std::stringstream func_id;
+    			func_id << f->getName() << "@" << std::hex << f->getAddress();
+
+	        	auto sys_node = getSysNode(f);
+        		if(sys_node == NULL)
+        	        	continue;
+	
+        		auto tot_syscalls = getSyscalls(sys_node);
+			std::cout << "    \"" << func_id.str() << "\": {\n";
+			std::cout << "      \"direct_syscalls\": [";
+			auto direct_syscalls = sys_node->direct_syscalls;
+			int i=1;
+			for(auto d : direct_syscalls)
+			{
+			        cout << "\"" << system_calls[d] << "\"";
+			        if (i < direct_syscalls.size()) 
+				{
+					cout << ", ";
+				}
+				i++;
+    			}
+			cout << "],\n";
+			// Reachable syscalls
+			std::cout << "      \"reachable_syscalls\": [";
+			i = 1;
+			for(auto t : tot_syscalls) 
+			{
+			        cout << "\"" << system_calls[t] << "\"";
+			        if (i < tot_syscalls.size()) 
+				{
+					cout << ", ";
+				}
+				i++;
+    			}
+			cout << "]\n";
+			cout << "  }";
+			if(fcount < fsize)
+			{
+				cout << ",";
+			}
+			cout<<"\n";	
+			fcount++;
+		}
+		cout << " }";
+		if(mcount < msize)
+			cout << ",";
+		cout<<"\n";
+		mcount++;
+	}
+	cout << "}\n";
     }
 }
 

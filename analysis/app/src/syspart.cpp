@@ -2285,7 +2285,7 @@ void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string f
     //ip_callgraph.addNssEdges();
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
-    vector<UDResult> res;
+    std::unordered_set<UDResult> res;
     util.getArgumentsPassedToFunction(func, reg , res);
 }
 
@@ -2318,13 +2318,13 @@ void Syspart::printDlArgs(string dlname)
     	initFuncs = ip_callgraph.getInitFuncs();
     	SyspartUtility util(program, &ip_callgraph, 0);
     	util.initialize();
-    	vector<UDResult> res;
 	int reg;
 	if(dlname == "dlopen")
 		reg = 7;
 	else if(dlname == "dlsym")
 		reg = 6;
-    	util.getArgumentsPassedToFunction(func, reg , res);
+    	std::unordered_set<UDResult> res;
+	util.getArgumentsPassedToFunction(func, reg , res);
 }
 
 

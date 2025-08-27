@@ -139,6 +139,10 @@ struct FPath
 	string fname;
 	address_t iaddr;
 	vector<Function*> path;
+
+	 FPath(const std::string& fname_, address_t iaddr_, const std::vector<Function*>& path_)
+        : fname(fname_), iaddr(iaddr_), path(path_) {}
+
 	bool operator==(const FPath& l)
 	{
 		if((l.fname == this->fname) &&(l.iaddr == this->iaddr))
@@ -157,6 +161,7 @@ class SyspartUtility
 			this->ip_callgraph = ipc;
 			this->iter = 0;
 			this->analysisType = analysisType;
+			this->recursion_iter = 0;
 
 		}
 		void initialize();

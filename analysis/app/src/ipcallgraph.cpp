@@ -240,8 +240,11 @@ map<address_t, set<IPCallGraphNode*>> IPCallGraphNode::getATList()
 
 void IPCallGraph::addFunctionRoot(Function* func)
 {
-	//if(visitedFunctions.count(func) != 0)
-	//s	return;
+	if (functionRootSet.find(func) != functionRootSet.end()) 
+	{
+	   return;
+	}
+	functionRootSet.insert(func);
 	functionRoots.push_back(func);
 }
 
@@ -249,6 +252,7 @@ void IPCallGraph::setRoot(Function* func)
 {
 	startfunc = func;
 	functionRoots.push_back(func);
+	functionRootSet.insert(func);
 }
 
 vector<Function*> IPCallGraph::getFiniFuncs()
@@ -572,15 +576,14 @@ void IPCallGraph::findData()
 							if(dataSection->getName()==".fini" || dataSection->getName()==".fini_array" || dataSection->getName()==".dtors")
 							{
 								LOG(20, "FINI Function "<<target->getName()<<" found in "<<dataSection->getName());
-								functionRoots.push_back(target);
+								addFunctionRoot(target);
 								finiFuncs.push_back(target);
 
 							}
 							if(dataSection->getName()==".preinit_array" || dataSection->getName()==".init_array" || dataSection->getName()==".ctors")
 							{
 								LOG(20, "INIT Function "<<target->getName()<<" found in "<<dataSection->getName());
-
-								functionRoots.push_back(target);
+								addFunctionRoot(target);
 								initFuncs.push_back(target);
 							}
 							
@@ -598,13 +601,13 @@ void IPCallGraph::findData()
 		auto init = CIter::named(module->getFunctionList())->find("_init");
         if (init) 
         {
-        	functionRoots.push_back(init);
-			initFuncs.push_back(init);
+		addFunctionRoot(init);
+		initFuncs.push_back(init);
         }
         auto fini = CIter::named(module->getFunctionList())->find("_fini");
         if (fini) 
         {
-        	functionRoots.push_back(fini);
+		addFunctionRoot(fini);
         	finiFuncs.push_back(fini);
 		}
 	}
@@ -2025,22 +2028,26 @@ void IPCallGraph::generateDirectCallGraph()
 {
 	checkForSymbols();
 	findData();
-	while(functionRoots.size())
+	
+
+	while(!functionRoots.empty())
 	{
-		auto it = functionRoots.begin();
-		auto next = *it;
-		functionRoots.erase(it);
+                auto next = functionRoots.front();
+                functionRoots.pop_front();
 		findDirectEdges(next);
 	}
-	copy(visited_direct.begin(), visited_direct.end(), back_inserter(functionRoots)); 
 	
-		while(functionRoots.size())
+        for (Function* func : visited_direct) {
+                addFunctionRoot(func);
+        }
+
+        while(!functionRoots.empty())
 		{
-			auto it = functionRoots.begin();
-			auto next = *it;
-			functionRoots.erase(it);
+                	auto next = functionRoots.front();
+                	functionRoots.pop_front();
 			findATList(next);
 		}
+
 }
 
 void IPCallGraph::generate()
@@ -2048,20 +2055,25 @@ void IPCallGraph::generate()
 	checkForSymbols();
 	findData();
 
-	while(functionRoots.size())
+	while(!functionRoots.empty())
 	{
-		auto it = functionRoots.begin();
-		auto next = *it;
-		functionRoots.erase(it);
+		auto next = functionRoots.front();
+		functionRoots.pop_front();
+		functionRootSet.erase(next);
 		findDirectEdges(next);
 	}
 
-	copy(visited_direct.begin(), visited_direct.end(), back_inserter(functionRoots)); 
-	while(functionRoots.size())
+	LOG(1,"SIZE OF VISITED DIRECT "<<visited_direct.size());
+	for (Function* func : visited_direct) {
+    		LOG(1,"ADD VISITED DIRECT FUNC AS ROOT "<<func->getName());
+		addFunctionRoot(func);
+	}
+
+	while(!functionRoots.empty())
 	{
-		auto it = functionRoots.begin();
-		auto next = *it;
-		functionRoots.erase(it);
+		auto next = functionRoots.front();
+		functionRoots.pop_front();
+		functionRootSet.erase(next);
 		findATList(next);
 	}
 

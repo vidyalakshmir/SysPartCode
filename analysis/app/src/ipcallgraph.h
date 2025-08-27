@@ -1,6 +1,8 @@
 #ifndef IPCALLGRAPH_ANALYSIS
 #define IPCALLGRAPH_ANALYSIS
 
+#include <unordered_set>
+
 #include "instr/linked-x86_64.h"
 #include "conductor/setup.h"
 #include "chunk/concrete.h"
@@ -51,19 +53,8 @@ class IPCallGraphNode
 		}
 		void addATFunction(address_t addr, IPCallGraphNode* t)
 		{
-			auto at_iter = ATFunctions.find(addr);
-			if(at_iter != ATFunctions.end())
-			{
-				auto at_set = at_iter->second;
-				at_set.insert(t);
-				at_iter->second = at_set;
-			}
-			else
-			{
-				set<IPCallGraphNode*> at_set;
-				at_set.insert(t);
-				ATFunctions[addr] = at_set;
-			}
+			auto& at_set = ATFunctions[addr];  // creates if not exists, returns reference
+			at_set.insert(t);                  // insert directly into the set
 		}
 		void setFunction(Function* f);
 		
@@ -187,7 +178,8 @@ class IPCallGraph
 	void generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, set<IPCallGraphNode*> at);
 	void parseTypeArmor();
 	void printNodeInfo();
-	vector<Function*> functionRoots;
+	std::deque<Function*> functionRoots;
+	std::unordered_set<Function*> functionRootSet;
 	vector<address_t> dataRoots;
 	vector<Function*> nssFunctions;
 	vector<string> nssFuncNames;

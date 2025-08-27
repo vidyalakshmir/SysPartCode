@@ -1028,32 +1028,140 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
         }
     };
 
-
-
-    for(auto block : CIter::children(function)) 
+    enum class BinaryOpType { ADD, SUB };
+    auto combineResults = [&](const std::unordered_set<UDResult>& a,
+                                const std::unordered_set<UDResult>& b,
+                                BinaryOpType op,
+                                std::unordered_set<UDResult>& out) 
     {
-        for(auto instruction : CIter::children(block)) 
+        LOG(1, "Res1.size "<<a.size()<< " Res2.size "<<b.size());
+        if(op == BinaryOpType::ADD)
+                LOG(1, "ADD");
+        else if(op == BinaryOpType::SUB)
+                LOG(1, "SUB");
+	    int tot_count=1000000;
+	    int i=0;
+        for (const auto& res1 : a) 
+        {
+		    if(i > tot_count)
+		    {
+			     break;
+		    }
+                for (const auto& res2 : b) 
+                {
+		          if(i > tot_count)
+		          {
+			         break;
+		          }
+		          i++;
+                  if (res1.type == 0 || res2.type == 0)
+                  {
+                        pushUnknownIfNeeded(out, function);
+
+                  } 
+                  else if (res1.type == 1 && res2.type == 1) 
+                  {
+                        address_t new_val = (op == BinaryOpType::ADD)
+                        ? res1.addr + res2.addr
+                        : res1.addr - res2.addr;
+                        std::stringstream sstream;
+                        sstream << "0x" << std::hex << new_val;
+                        std::string new_str = sstream.str();
+                        out.emplace(1, new_val, new_str, function);
+                  } 
+                  else 
+                  {
+                        std::string op_str = (op == BinaryOpType::ADD) ? " + " : " - ";
+                        std::string new_str = res1.desc + op_str + res2.desc;
+                        out.emplace(3, 0, new_str, function);
+                  }
+                }
+        }
+    };
+
+	enum class ConstOpType { ADD, SUB, MULT };
+    auto combineWithConstant = [&](const std::unordered_set<UDResult>& vals,
+                              address_t constant,
+                              ConstOpType op,
+                              std::unordered_set<UDResult>& out) 
+    {
+
+        LOG(1, "Res1.size "<<vals.size()<<std::hex<<constant);
+        if(op == ConstOpType::ADD)
+            LOG(1, "ADD");
+        else if(op == ConstOpType::SUB)
+            LOG(1, "SUB");
+	   else if(op == ConstOpType::MULT)
+		    LOG(1, "MULT");
+
+        for (const auto& udres : vals) 
+        {
+            if (udres.type == 0)
+            {
+	                LOG(1,"Combine with constant");
+        	        pushUnknownIfNeeded(out, function);
+            }
+            else if (udres.type == 1) 
+            {
+			    address_t new_val;
+		        if (op == ConstOpType::ADD)
+				    new_val =  udres.addr + constant;
+			    else if (op == ConstOpType::SUB)
+ 	                new_val = udres.addr - constant;
+			    else if (op ==  ConstOpType::MULT)
+				    new_val = udres.addr * constant;
+	            std::stringstream sstream;
+        	    sstream << "0x" << std::hex << new_val;
+                out.emplace(1, new_val, sstream.str(), function);
+            } 
+		    else 
+		    {
+                	std::stringstream sstream;
+	                if (op == ConstOpType::ADD) 
+                    {
+        	                sstream << "val(0x" << std::hex << constant << " + " << udres.desc<<")";
+                	} 
+			        else if (op == ConstOpType::SUB)
+			         {
+                        	sstream << "val(" << udres.desc << " - 0x" << std::hex << constant<<  ")";
+                	}
+			         else if (op == ConstOpType::MULT)
+                        {
+				        sstream << "val(0x" << std::hex << constant << " * " << udres.desc << ")";
+                        }
+
+                	out.emplace(3, 0, sstream.str(), function);
+                }
+        }
+    };
+
+
+
+    for (auto block : CIter::children(function)) 
+    {
+        for (auto instruction : CIter::children(block)) 
         {
             auto semantic = instruction->getSemantic();
             auto state = working->getState(instruction);
 
-	       auto ici = dynamic_cast<IndirectCallInstruction *>(semantic);
-	       auto iji = dynamic_cast<IndirectJumpInstruction *>(semantic);
+            auto ici = dynamic_cast<IndirectCallInstruction *>(semantic);
+            auto iji = dynamic_cast<IndirectJumpInstruction *>(semantic);
 	    
-	       if (iji && iji->isForJumpTable())
-           {
+            if (iji && iji->isForJumpTable())
+            {
                 continue;
-           }
+            }
         
-           if (!(ici || iji))
-           {
+            if (!(ici || iji))
+            {
                 continue;
-           }
+            }
 
-	       vector<IndirectCallTarget> icTargets;
-           cur_function = function;
-           cur_instr = instruction;
-            auto continueFlag = true;
+            // Handle iteration path logic
+            cur_function = function;
+            cur_instr = instruction;
+            bool continueFlag = true;
+
             if (iter > 1) 
             {
                 continueFlag = false;
@@ -1084,13 +1192,11 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                         }
                     }
                 }
-            }
-            else
+            } 
+            else 
             {
-                vector<Function*> fp_vec;
-                fp_vec.push_back(cur_function);
-                FPath fp{cur_function->getName(),cur_instr->getAddress(), fp_vec};
-                icPath.push_back(fp);
+                vector<Function*> fp_vec{cur_function};
+                icPath.emplace_back(cur_function->getName(), cur_instr->getAddress(), fp_vec);
             }
                 
             if(!continueFlag)
@@ -1110,6 +1216,8 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
             }
 			
             stack_depth = 0;
+
+            vector<IndirectCallTarget> icTargets;
 	    std::unordered_set<UDResult> results;
             if(ici && ici->hasMemoryOperand()) 
             {
@@ -1117,10 +1225,76 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                     target.setUnknown();
                     icTargets.push_back(target);
                     
+		auto indexReg = X86Register::convertToPhysical(ici->getIndexRegister());
+		auto reg = X86Register::convertToPhysical(ici->getRegister());
+		auto scale = ici->getScale();
+		auto disp = ici->getDisplacement();
+
+		InstrDumper instrdumper(instruction->getAddress(), INT_MIN);
+		instruction->getSemantic()->accept(&instrdumper);
+		LOG(1, "ICALL_MEM_OP REG " << std::dec << reg << " INDEXREG = "<< indexReg << " SCALE = " <<  ici->getScale() << std::hex << " DISP = " << ici->getDisplacement());
+		
+		std::unordered_set<UDResult> regResult;
+		std::unordered_set<UDResult> indexResult;
+
+		if(reg != -1)
+		{
+	                resolveRegister(reg, state, function, regResult);
+		}
+
+		if(indexReg != -1)
+		{
+        	        resolveRegister(indexReg, state, function, indexResult);
+		}
+                instruction->getSemantic()->accept(&instrdumper);
+
+		// disp(reg, index, scale) = value at memory address (reg + index * scale + disp)
+		if(indexReg == -1) // reg + disp
+		{
+			if(disp > 0)
+				combineWithConstant(regResult, (address_t)disp, ConstOpType::ADD, results);
+			else if(disp < 0)
+			{
+				disp = (-1) * disp;
+				combineWithConstant(regResult, (address_t)disp, ConstOpType::SUB, results);
+			}
+			else //disp = 0
+			{
+				results = regResult;
+			}
+		}
+		else		  // reg + index * scale + disp
+		{
+			// index*scale
+			std::unordered_set<UDResult> inter_result1;
+			combineWithConstant(indexResult, scale, ConstOpType::MULT, inter_result1);
+
+			// reg + (index*scale)
+			std::unordered_set<UDResult> inter_result2;
+			combineResults(inter_result1, regResult, BinaryOpType::ADD, inter_result2);
+
+			// reg + (index*scale) + disp
+			if(disp > 0)
+                                combineWithConstant(inter_result2, (address_t)disp, ConstOpType::ADD, results);
+                        else if(disp < 0)
+                        {
+                                disp = (-1) * disp;
+                                combineWithConstant(inter_result2, (address_t)disp, ConstOpType::SUB, results);
+                        }
+			else // disp = 0
+			{
+				results = inter_result2;
+			}
+		}
+		
+                LOG(1, "ICALL_RESOLVE UNRESOLVE_MEMORY_OPERAND " << std::hex << instruction->getAddress()
+                      << " " << std::dec << instruction->getAddress() << " " << function->getName());
+		////indent();
+                LOG(1, "CAUTION : UNRESOLVED IC DUE TO MEMORY OPERAND"); 
             }
             else 
             {
-		          int reg;
+                int reg = -1;
 		          if(ici)
 		          {
                     reg = X86Register::convertToPhysical(ici->getRegister());
@@ -1130,7 +1304,7 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
 			         reg = X86Register::convertToPhysical(iji->getRegister());
 		          }
                 resolveRegister(reg, state, function, results);
-
+            }
                 for (auto& r : results) 
                     {
                         printResult(r);
@@ -1163,7 +1337,6 @@ bool SyspartUtility::findIndirectCallTargets(IPCallGraphNode* n)
                         }
                     }
                     
-                }
                 //Add resolved indirect calls
                 bool resolved = true;
                 set<address_t> targets;

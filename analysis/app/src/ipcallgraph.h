@@ -1,6 +1,7 @@
 #ifndef IPCALLGRAPH_ANALYSIS
 #define IPCALLGRAPH_ANALYSIS
 
+#include "instr/linked-x86_64.h"
 #include "conductor/setup.h"
 #include "chunk/concrete.h"
 #include "analysis/usedef.h"
@@ -200,6 +201,8 @@ class IPCallGraph
 	DataFlow df;
 	int totResolvedIcTarget=0;
 	int totTypeArmorTarget=0;
+	std::map<std::tuple<int, Function*, Instruction*>, bool> handle_arg_cache;
+	int forwardDfAnalysisType=0;
 	public:
 	map<Function*, IPCallGraphNode*> nodeMap;
 	void addFunctionRoot(Function* func);
@@ -248,7 +251,7 @@ class IPCallGraph
 	}
 	void setTypeArmor(bool flag) //typeArmorFlag determines if you want to add typearmor analysis to filter indirect call targets
 	{
-		this->typeArmorFlag = true;
+		this->typeArmorFlag = flag;
 	}
 	void setTypeArmorPath(string path)
 	{
@@ -265,7 +268,7 @@ class IPCallGraph
 	void printCallGraphWithCallsites();
 	void printIndirectEdges();
 	void printDirectEdges();
-	bool forwardDataFlow(Function* f, Instruction* instr, Function* atfunc);
+	bool forwardDataFlow(Function* f, Instruction* instr, Function* atfunc, int analysisType=0);
 
 	set<Function*> getFunctionByAddress(address_t addr);
 	Function* getNSSFunctionByName(string name);
@@ -289,6 +292,13 @@ class IPCallGraph
 		nssFuncNames.push_back(fname);
 	}
 	void addNssEdges();
+	Instruction* findInstructionInFunction(Function* func, address_t addr);
+	bool handleReturnInstruction(UDState* state, int reg1, Function* atfunc);
+	bool handleIcallOrIjump(UDState* state, int reg1, Function* atfunc);
+	bool handleDirectCall(UDState* state, ControlFlowInstruction* cfi, int reg1, Function* atfunc);
+	bool handleDataLinked(UDState* state, int reg1, Function* atfunc);
+	bool handleRegisterDefinition(UDState* state, int reg1, Function* atfunc, bool& out_result);
+	bool handleMemoryDefinition(UDState* state, int reg1, Function* atfunc);
 };
 
 #endif

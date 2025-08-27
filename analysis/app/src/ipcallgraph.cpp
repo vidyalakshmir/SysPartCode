@@ -1087,291 +1087,483 @@ void IPCallGraph::findDirectEdges(Function* f)
 
 }
 
+Instruction* IPCallGraph::findInstructionInFunction(Function* func, address_t addr) {
+    for (auto block : CIter::children(func)) {
+        for (auto instr : CIter::children(block)) {
+            if (instr->getAddress() == addr) {
+                return instr;
+            }
+        }
+    }
+    return NULL;
+}
+
 bool IPCallGraph::handleArgumentFnPtr(int reg, Function* f, Instruction* instr, Function* atfunc)
 {
-	auto ipnode = getNode(f);
-	if(f == NULL)
+    // Check the member cache, which is safer than a static cache.
+    auto key = std::make_tuple(reg, f, instr);
+    if (handle_arg_cache.count(key)) {
+    	LOG(1, "$$$ RETURN CACHED RESULT "<<f->getName()<<" "<<atfunc->getName()<<" "<<reg<<" "<<handle_arg_cache.at(key));
+        return handle_arg_cache.at(key);
+    }
+
+    auto ipnode = getNode(f);
+    if (ipnode == NULL) {
+        return false;
+    }
+
+    bool result = false;
+    bool flag = true;
+    bool found = false;
+    auto direct_children = ipnode->getDirectChildren();
+    auto it = direct_children.find(instr->getAddress());
+
+    if(it == direct_children.end())
+    {
+	LOG(1, "No function invokation within "<<f->getName()<<" @ "<<std::hex<<instr->getAddress());
+	handle_arg_cache[key] = false;
+	return false;
+    }
+    // Loop through all functions called at this site
+    for (auto s : it->second)
+    {
+        auto ch_func = s->getFunction();
+        LOG(1,"FDF ARGS_EXAMINING_FUNC "<<atfunc->getName()<<" "<<ch_func->getName());
+
+        found = false;
+        auto working = df.getWorkingSet(ch_func);
+
+        typedef TreePatternCapture<TreePatternTerminal<TreeNodePhysicalRegister>>RegisterValue;
+
+        found = false;
+        for(auto bl : CIter::children(ch_func))
+        {
+            for(auto ins : CIter::children(bl))
+            {
+                auto state = working->getState(ins);
+                for(auto& def : state->getRegDefList())
+                {
+                    TreeCapture cap;
+                    if(RegisterValue::matches(def.second, cap))
+                    {
+                        auto reg2 = dynamic_cast<TreeNodePhysicalRegister *>(cap.get(0))->getRegister();
+                        if(reg2 == reg)                 //First instruction where reg is referenced
+                        {
+                            //startState = state;         //State found
+                            auto use1 = state->getRegUse(def.first);
+                            auto use2 = state->getRegUse(reg2);
+                            for(auto u : use1)
+                            {
+                                auto tempFlag = searchDownDef(u, def.first, atfunc);
+                                LOG(20, std::hex<<instr->getAddress()<<" Received "<<tempFlag);
+                                flag = tempFlag & flag;
+                            }
+                            for(auto u : use2)
+                            {
+                                auto tempFlag = searchDownDef(u, reg2, atfunc);
+                                LOG(20, std::hex<<instr->getAddress()<<" Received "<<tempFlag);
+                                flag = tempFlag & flag;
+                            }
+                            LOG(1,"FDF ARGS_REG_USE_FOUND "<<atfunc->getName()<<" "<<ch_func->getName());
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if(!found)
+                {
+                    auto treenode = state->getMemDef(reg);
+                    if(treenode != NULL)                    //Handling cases when assigned to a memory address
+                    {
+                        //cout<<"WARNING : WRITE TO MEMORY DETECTED @ "<<std::hex<<state->getInstruction()->getAddress()<<endl;
+                        LOG(1,"FDF ARGS_MEMORY_WRITE "<<atfunc->getName()<<" "<<ch_func->getName());
+                        InstrDumper instrdumper(ins->getAddress(), INT_MIN);
+                        ins->getSemantic()->accept(&instrdumper);
+                        
+                        //Case 2.1 : Tracking value through memory when memuselist is available
+                        bool enteredFlag = false;
+                        flag = true;
+                        //Get the address corresponding to treenode
+                        for(auto& mu : state->getMemUse(reg))
+                        {
+                            enteredFlag = true;
+                            auto tempFlag = searchDownDef(mu, -1, atfunc);
+                            flag = tempFlag & flag;
+                        }
+                        state->dumpState();
+                        if(!enteredFlag)
+                        {
+                            handle_arg_cache[key] = false;
+                            return false;
+                        }
+                        found = true;
+                       
+                    }
+                    LOG(1,"FDF ARGS_NO_REG_USE "<<atfunc->getName()<<" "<<ch_func->getName());
+                }
+                else
+                    break;
+            }
+    }
+            //Check for cases where this argument flows to a call/jmp
+            //Check for the last instruction of first block
+            int bl_iter=0;
+            Instruction* lastinstr = NULL;
+            bool regFlag = false;
+            for(auto bl : CIter::children(ch_func))
+            {
+                if(bl_iter > 0)
+                    break;
+                for(auto ins : CIter::children(bl))
+                {
+                    auto st = working->getState(ins);
+                    if(st->getRegDef(reg) != NULL)
+                    {
+                        regFlag = true;
+                        break;
+                    }
+                    lastinstr = ins;
+                }
+                if(regFlag)
+                    break;
+                bl_iter++;
+
+            }
+            if(!regFlag)
+            {
+                if(auto cfi = dynamic_cast<ControlFlowInstruction *>(lastinstr->getSemantic()))
+                {
+                    auto link = cfi->getLink();
+                    auto target = link->getTarget();
+                    if(auto func_target = dynamic_cast<Function*>(target)) //Ends with a direct call/jump
+                    {
+                        //cout<<std::hex<<lastinstr->getAddress()<<" targets "<<func_target->getName()<<endl;
+                        auto lastflag = handleArgumentFnPtr(reg, ch_func, lastinstr, atfunc);
+                        LOG(1,"FDF ARGS_FIRST_CALL "<<lastflag<<" "<<flag<<" "<<found<<" "<<atfunc->getName()<<" "<<ch_func->getName()<<" "<<std::hex<<instr->getAddress());
+
+                                        if(found)
+                                        {
+                                                lastflag = flag & lastflag;
+                                        }
+                                        LOG(1,"FDF ARGS_FIRST_CALL_1 "<<lastflag<<" "<<atfunc->getName()<<" "<<ch_func->getName());
+                                        handle_arg_cache[key] = lastflag;
+                                        return lastflag;
+
+                    }
+
+                }
+                if(auto ici = dynamic_cast<IndirectCallInstruction*>(lastinstr->getSemantic())) //If is an argument to indirect call, return false
+                {
+                    handle_arg_cache[key] = false;
+                    return false;
+                }
+            }
+                if(found)
+                    break;
+            //Case 2.2 : Checks for tail jump
+            lastinstr = NULL;
+            for(auto bl : CIter::children(ch_func))
+                    {
+                            for(auto ins : CIter::children(bl))
+                            {
+                                lastinstr = ins;
+                }
+            }
+
+            auto lastinstrSemantic = lastinstr->getSemantic();
+            if(auto cfi = dynamic_cast<ControlFlowInstruction *>(lastinstr->getSemantic()))
+            {
+                auto link = cfi->getLink();
+                auto target = link->getTarget();
+                if (auto func_target = dynamic_cast<Function*>(target))
+                {
+                    LOG(1,"TAIL JUMP @ "<<ch_func->getName()<<std::hex<<lastinstr->getAddress());
+                    auto lastflag = handleArgumentFnPtr(reg, ch_func, lastinstr, atfunc);
+                    return lastflag;
+                }
+            }
+
+            //Check if the reg value is used in any indirect jumps
+            for(auto bl : CIter::children(ch_func))
+            {
+                for(auto ins : CIter::children(bl))
+                {
+                    auto ins_semantic = ins->getSemantic();
+                    if(auto ij = dynamic_cast<IndirectJumpInstruction *>(ins_semantic))
+                                {
+                                        if(ij->getRegister() != X86_REG_RIP)
+                                        {
+                                                int jmp_reg = X86Register::convertToPhysical(ij->getRegister());
+
+                                                if(reg == jmp_reg)
+                                                {
+                                auto ijump_state = working->getState(ins);
+                                auto ijump_ref_reg = ijump_state->getRegRef(reg);
+                                if(ijump_ref_reg.size() == 0)           //This handles when AT is passed as argument to a function and is directly used in ijump. There won't be any reg references for that register. It is done in this way because usedef chain cannot capture the first use of register in ijump
+                                {
+                                                            found = true;
+                                    LOG(1,"FDF USED_IN_IJUMP "<<atfunc->getName()<<" used in ijump "<<ch_func->getName()<<" @ instr "<<std::hex<<ins->getAddress());
+                                                            handle_arg_cache[key] = true;
+                                    return true;
+                                }
+                                                }
+                                        }
+                                }
+
+                }
+            }
+
+
+
+    }
+
+    if(!found)
+    {
+        LOG(1,"FDF ARGS_NO_REG_USE "<<atfunc->getName());
+        handle_arg_cache[key] = false;
+        return false;
+    }
+    // Store result in the member cache and return.
+    handle_arg_cache[key] = flag;
+    return flag;
+}
+
+bool IPCallGraph::handleReturnInstruction(UDState* state, int reg1, Function* atfunc)
+{
+	auto instr = state->getInstruction();
+	auto cur_func = (Function*)instr->getParent()->getParent();
+	if(reg1 != 0)
 	{
-		return false;
+		LOG(1,"FDF NO_USE_END_OF_FUNC "<<atfunc->getName()<<" "<<cur_func->getName());
+        return true;
 	}
-	auto dir_ch = ipnode->getDirectChildren();
-	auto dir_it = dir_ch.find(instr->getAddress());
+
 	bool flag = true;
-	bool found = false;
-	if(dir_it != dir_ch.end())
+	LOG(1,"FDF ENDS_IN_RETURN "<<atfunc->getName()<<" "<<cur_func->getName());
+	if(cur_func->isIFunc())
 	{
-		auto dir_ch_set = dir_it->second;
-		for(auto s : dir_ch_set)
-		{
-			auto ch_func = s->getFunction();
-			auto graph = new ControlFlowGraph(ch_func);
-    		auto config = new UDConfiguration(graph);
-    		auto working = new UDRegMemWorkingSet(ch_func, graph);
-    		auto usedef =  new UseDef(config, working);
-    		SccOrder order(graph);
-    		order.genFull(0);
-    		usedef->analyze(order.get());
-
-    		UDState* startState=NULL;
-    		typedef TreePatternCapture<TreePatternTerminal<TreeNodePhysicalRegister>>RegisterValue;
-    		
-    		found = false;
-    		for(auto bl : CIter::children(ch_func))
-    		{
-    			for(auto ins : CIter::children(bl))
-    			{
-    				auto state = working->getState(ins);
-    				for(auto& def : state->getRegDefList())
-    				{
-    					TreeCapture cap;
- 						if(RegisterValue::matches(def.second, cap))
- 						{
- 							
- 							auto reg2 = dynamic_cast<TreeNodePhysicalRegister *>(cap.get(0))->getRegister();
-
- 							if(reg2 == reg)					//First instruction where reg is referenced
- 							{
- 								startState = state;			//State found
- 								auto use1 = state->getRegUse(def.first);
- 								auto use2 = state->getRegUse(reg2);
- 								for(auto u : use1)
- 								{
- 									auto tempFlag = searchDownDef(u, def.first, atfunc);
-            						LOG(20, std::hex<<instr->getAddress()<<" Received "<<tempFlag);
-            						flag = tempFlag & flag;
- 								}
- 								for(auto u : use2)
- 								{
- 									auto tempFlag = searchDownDef(u, reg2, atfunc);
-            						LOG(20, std::hex<<instr->getAddress()<<" Received "<<tempFlag);
-            						flag = tempFlag & flag;
- 								}
- 								found = true;
- 								break;
- 							}
- 						}
-    				}
-    				if(!found)
-    				{
-    					auto treenode = state->getMemDef(reg);
-    					if(treenode != NULL)					//Assigned to a memory address, return false
-    					{
-    						return false;
-    					}
-    				}
-    				else
-    					break;
-
-    			}
-    			if(found)
-    				break;
-    		}
-    	}
+		LOG(1,cur_func<<" is an IFUNC. Returning");
+		return 0;
 	}
-	if(!found)
-		return false;
+	auto ipnode = getNode(cur_func);
+	if (ipnode == NULL)
+	{
+    	LOG(1, "Could not find call graph node for function " << cur_func->getName());
+    	return false;
+	}
+	ipnode->addATReturn(atfunc);
+	for (const auto& parent_call_info : ipnode->getParentWithType())
+	{
+		address_t call_site_address;
+		IPCallGraphNode* caller_node;
+		tie(call_site_address, caller_node) = parent_call_info.first;
+
+		bool ptype = parent_call_info.second;
+
+		auto caller_func = caller_node->getFunction();
+		if(ptype == false)
+			continue;
+		Instruction* call_instr = findInstructionInFunction(caller_func, call_site_address);
+
+		auto pworking = df.getWorkingSet(caller_func);
+    	auto caller_state = pworking->getState(call_instr);
+		auto tempflag = searchDownDef(caller_state, reg1, atfunc);
+		flag = flag & tempflag;
+
+	}
 	return flag;
 }
 
-bool IPCallGraph::searchDownDef(UDState* state, int reg1, Function* atfunc)
+bool IPCallGraph::handleIcallOrIjump(UDState* state, int reg1, Function* atfunc)
 {
-   
-    for(auto v : visited_states)
-    {
-    	Instruction* ins;
-    	int rr;
-    	tie(ins, rr) = v;
-    	if((ins == state->getInstruction()) && (rr == reg1))
-    		return true;
-    }
-    tuple<Instruction*,int> tup1(state->getInstruction(),reg1);
-	visited_states.insert(tup1);
+
     auto instr = state->getInstruction();
     auto cur_func = (Function*)instr->getParent()->getParent();
-    if(dynamic_cast<ReturnInstruction *>(instr->getSemantic())) //DF ends in a return statement
+    if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to indirect call?
     {
-	    	if(reg1 == 0) //RAX
-    	{
-		bool flag = true;
-		//cout<<"FDF ENDS_IN_RETURN "<<atfunc->getName()<<" "<<cur_func->getName()<<endl;
-		auto ipnode = getNode(cur_func);
-		ipnode->addATReturn(atfunc);
-		if(ipnode != NULL)
-	        {
-			auto p = ipnode->getParentWithType();
-			for(auto pp : p)
-			{
-				address_t paddr;
-				IPCallGraphNode* pnode;
-				tie(paddr, pnode) = pp.first;
-				auto pfunc = pnode->getFunction();
-				bool ptype = pp.second;
-				if(ptype == false)
-					continue;
-				Instruction* pinstr = NULL;
-				for(auto bl : CIter::children(pfunc))
-				{
-					for(auto instr : CIter::children(bl))
-					{
-						if(instr->getAddress() == paddr)
-						{
-							pinstr = instr;
-							break;
-						}
-					}
-				}
-				auto pgraph = new ControlFlowGraph(pfunc);
-				auto pconfig = new UDConfiguration(pgraph);
-			        auto pworking = new UDRegMemWorkingSet(pfunc, pgraph);
-				auto pusedef =  new UseDef(pconfig, pworking);
-			        SccOrder order(pgraph);
-			        order.genFull(0);
-			        pusedef->analyze(order.get());
-    	                        auto pstate = pworking->getState(pinstr);
-				auto tempflag = searchDownDef(pstate, reg1, atfunc);
-                                //cout<<cur_func->getName()<<" invoked from "<<pfunc->getName()<<" "<<tempflag<<endl;
-				flag = flag & tempflag;
-			}
-		}
-    		return flag;
-    	}
-	else
-	{
-		//cout<<"FDF NO_USE_END_OF_FUNC "<<atfunc->getName()<<" "<<cur_func->getName()<<endl;
-        	return true;
-	}
-    }
-    else if(auto ici =  dynamic_cast<IndirectCallInstruction *>(instr->getSemantic())) //DF ends in an indirect call
-    {
-        if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to indirect call?
-        {
+	    LOG(1,"FDF ARGS_TO_ICALL "<<atfunc->getName()<<" "<<cur_func->getName());
             return false;
-        }
-        else  						//Flowing into an indirect call. Adding as an edge at this indirect call
-        {
-        	addEdge(instr->getAddress(), (Function*)instr->getParent()->getParent(), atfunc, false);
-        	return true;
-        }
-        
     }
-    else if(auto iji =  dynamic_cast<IndirectJumpInstruction *>(instr->getSemantic())) //DF ends in an indirect jump tail call recursion
+    else  						//Flowing into an indirect call. Adding as an edge at this indirect call
     {
-
-        if(!iji->isForJumpTable())
-	{
-		if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to indirect call?
-        	{
-            		return false;
-        	}
-        	else                                            //Flowing into an indirect call. Adding as an edge at this indirect call
-        	{
-                	addEdge(instr->getAddress(), (Function*)instr->getParent()->getParent(), atfunc, false);
-                	return true;
-        	}
-	}
-
+	LOG(1,"FDF USED_IN_ICALL "<<atfunc->getName()<<" used in icall "<<cur_func->getName()<<" @ instr "<<std::hex<<instr->getAddress());
+       	addEdge(instr->getAddress(), cur_func, atfunc, false);
+       	return true;
     }
-    else if(dynamic_cast<DataLinkedControlFlowInstruction *>(instr->getSemantic())) 
+}
+
+bool IPCallGraph::handleDirectCall(UDState* state, ControlFlowInstruction* cfi, int reg1, Function* atfunc)
+{
+    auto mnemonic = cfi->getMnemonic();
+    auto instr = state->getInstruction();
+    auto cur_func = (Function*)instr->getParent()->getParent();
+
+    if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to CFI?
     {
-        if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to data link instruction
-        {
+		LOG(1,"FDF USED_AS_ARGS_TO_CALL "<<atfunc->getName()<<" used as args from callerfn "<<cur_func->getName()<<" @ "<<std::hex<<instr->getAddress());
+        bool res = handleArgumentFnPtr(reg1, cur_func, instr, atfunc);
+        return res;
+    }
+    LOG(1,"FDF USED_IN_CALL "<<atfunc->getName()<<" "<<cur_func->getName());
+    return true;
+}
+
+bool IPCallGraph::handleDataLinked(UDState* state, int reg1, Function* atfunc)
+{
+    auto instr = state->getInstruction();
+    auto cur_func = (Function*)instr->getParent()->getParent();
+    if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to data link instruction
+    {
+	    LOG(1,"FDF ENDS_IN_DFD "<<atfunc->getName()<<" "<<cur_func->getName());
             return false;
-        }
-        else 
-        {                                         //If any other register, then it is actually not used in this instruction
-        }
-        return true;
     }
-    if(auto cfi = dynamic_cast<ControlFlowInstruction *>(instr->getSemantic())) //DF ends in a call/jmp
-    {
-        auto mnemonic = cfi->getMnemonic();
-        if(mnemonic.find("call") == string::npos)   //Not a call instruction
-        {
-            return false;
-        }
-        if(reg1 == 7 || reg1 == 6 || reg1 == 2 || reg1 == 1 || reg1 == 8 || reg1 == 9) //Argument to CFI?
-        {
-        	bool res = handleArgumentFnPtr(reg1, (Function*)instr->getParent()->getParent(), instr, atfunc);
-            return res;
-        }
 
-        
-        return true;
-    }
-    
+    LOG(1,"FDF DFD_NOT_ARGS "<<atfunc->getName()<<" "<<cur_func->getName());
+    return true;
+}
 
+
+
+bool IPCallGraph::handleRegisterDefinition(UDState* state, int reg1, Function* atfunc, bool& out_result)
+{
     bool regFlag = false;
     bool flag = true;
-    int reg=-1;
-    for(auto& def : state->getRegDefList())                      //Register definition is found
+    int reg = -1;
+
+    auto instr = state->getInstruction();
+    auto cur_func = (Function*)instr->getParent()->getParent();
+    for (auto& def : state->getRegDefList())
     {
         regFlag = true;
-       
-        
         reg = def.first;
-        if(reg1 != -2)  //Handling the starting call of this function when reg1 value is not set
+
+        if(reg1 != -2 && reg1 != -1)  //Handling the starting call of this function when reg1 value is not set
         {
             typedef TreePatternCapture<TreePatternTerminal<TreeNodePhysicalRegister>>RegisterValue;
             TreeCapture cap;
-            if(RegisterValue::matches(def.second, cap)) 
+            if(RegisterValue::matches(def.second, cap))
             {
                 auto reg2 = dynamic_cast<TreeNodePhysicalRegister *>(cap.get(0))->getRegister();
                 if(reg2 != reg1)
                 {
-                    return false;
+	            LOG(1,"FDF REGDEF_MISMATCH1 "<<atfunc->getName()<<" "<<cur_func->getName());
+                    out_result = false; // Set the out-parameter
+                    return true;
                 }
             }
-            else
-            {
-                return false;
-            }
-            
-        }
-        auto reguse = state->getRegUse(reg);
-        
-        for(auto use : reguse)
-        {
+	}
+
+        for (auto& use : state->getRegUse(reg)) 
+	{
             auto tempFlag = searchDownDef(use, reg, atfunc);
-            flag = tempFlag & flag;
+            flag = flag & tempFlag;
         }
     }
-    if(regFlag)
-    {
-        	
-        return flag;
+
+    if (regFlag) {
+        out_result = flag;  // Set the out-parameter with the final flag
+        LOG(1,"FDF RETURN_FROM_REGFLAG "<<atfunc->getName()<<" "<<flag<<" "<<cur_func->getName());
+        return true;        // Signal that we are done and have a result
     }
-    auto memdef = state->getMemDefList();
-    bool memFlag = false;
-    flag = true;
-    for(auto def : memdef)                  //If memory definition is found, return false
-    {	
-    	if(def.first != reg1)				//Iff reg1 not used in memory definition, then we can return true 
-    		flag = true;
-    	else
-        	flag = false;
-    }
-    if(flag)
-    {
-        //cout<<std::hex<<instr->getAddress()<<" MEMDEF TRUE "<<endl;
-    }
-    return flag;                            //If none of the above cases match, return true;
+
+    //  If we reach here, we have no conclusive answer. Signal the caller to continue.
+    return false;
 }
 
-bool IPCallGraph::forwardDataFlow(Function* f, Instruction* instr, Function* atfunc)
+bool IPCallGraph::handleMemoryDefinition(UDState* state, int reg1, Function* atfunc)
 {
-	auto graph = new ControlFlowGraph(f);
-    auto config = new UDConfiguration(graph);
-    auto working = new UDRegMemWorkingSet(f, graph);
-    auto usedef =  new UseDef(config, working);
-    SccOrder order(graph);
-    order.genFull(0);
-    usedef->analyze(order.get()); 
-	auto state = working->getState(instr);
+    auto instr = state->getInstruction();
+    auto cur_func = (Function*)instr->getParent()->getParent();
+    bool memFlag = false;
+    bool flag = true;
+    for(auto& def : state->getMemDefList())                  //If memory definition is found, return false
+    {
+    	if(def.first != reg1)			//If reg1 not used in memory definition, then we can return true
+		{
+			LOG(1,"FDF NOT_ENDING_IN_MEMDEF "<<atfunc->getName()<<" "<<cur_func->getName());
+    		flag = true;
+		}
+    	else
+		{
+			//cout<<"******** USES OF "<<std::dec<<reg1<<" AT "<<std::hex<<state->getInstruction()->getAddress()<<endl;
+			// Case 2.1 : Handling values through memory when mem use list is available
+			flag = true;
+			bool enteredFlag = false;
+			for (auto& mu : state->getMemUse(reg1))
+			{
+				//cout<<"*********** Found memuse of "<<std::dec<<reg<<" in "<<std::hex<<mu->getInstruction()->getAddress()<<endl;
+				enteredFlag = true;
+				auto tempFlag = searchDownDef(mu,-1,atfunc);	//Handling special case where memory use flows to regdef.. the register is not matched in this case and hence -1
+				flag = tempFlag & flag;
+			}
+			if(!enteredFlag)	//There is a memory definition, but no uses of memory found. We cannot confirm if the value is used or not
+        			flag = false;
+		 	
+		}
+    }
+    LOG(1, "FDF RETURN_FROM_MEMDEF_END " << atfunc->getName());
+    return flag;
+}
+bool IPCallGraph::searchDownDef(UDState* state, int reg1, Function* atfunc) {
 
-	
+    // Efficient search of visited_states
+    auto key = std::make_tuple(state->getInstruction(), reg1);
+    if (visited_states.count(key)) {
+        return true; // Already visited, assume success to break cycle
+    }
+    visited_states.insert(key);
 
+    auto instr = state->getInstruction();
+    auto semantic = instr->getSemantic();
+
+    // Dispatch to the correct handler based on instruction type
+    // Handle return instruction
+    if (auto return_instr = dynamic_cast<ReturnInstruction*>(semantic)) 
+    {
+        return handleReturnInstruction(state, reg1, atfunc);
+    }
+    else if (auto ici = dynamic_cast<IndirectCallInstruction*>(semantic)) 
+    {
+        return handleIcallOrIjump(state, reg1, atfunc);
+    }
+    else if (auto iji = dynamic_cast<IndirectJumpInstruction*>(semantic)) 
+    {
+    	if(!iji->isForJumpTable())
+    	{
+			return handleIcallOrIjump(state, reg1, atfunc);
+		}
+    }
+    else if(dynamic_cast<DataLinkedControlFlowInstruction *>(semantic))
+    {
+    	return handleDataLinked(state, reg1, atfunc);
+    }
+    else if (auto cfi = dynamic_cast<ControlFlowInstruction*>(semantic)) 
+    {
+        // This handles direct calls and jumps after the more specific cases
+        return handleDirectCall(state, cfi, reg1, atfunc);
+    }
+
+    bool regdef_result; 
+
+	// Call the helper. If it returns true, we have our final answer.
+	if (handleRegisterDefinition(state, reg1, atfunc, regdef_result)) 
+	{
+    	return regdef_result;
+	}
+	//If it flows to a memory address
+    return handleMemoryDefinition(state, reg1, atfunc);
+}
+
+bool IPCallGraph::forwardDataFlow(Function* f, Instruction* instr, Function* atfunc, int analysisType)
+{
+    forwardDfAnalysisType = analysisType;
+    auto working = df.getWorkingSet(f);
+    auto state = working->getState(instr);
+
+    LOG(1,"FDF ENTER "<<atfunc->getName()<<std::hex<<instr->getAddress());
     auto res = searchDownDef(state, -2, atfunc);    //We don't have a register value to pass, so passing -2
     visited_states.clear();
+    LOG(1,"FDF EXIT "<<atfunc->getName()<<std::hex<<instr->getAddress());
     return res;
 }
 

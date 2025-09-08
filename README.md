@@ -8,6 +8,9 @@ We update this repository to add more features and fix bugs. In case of any quer
 
 
 ## Upgrades and fixes
+**⚡ LATEST UPDATE (SCALABLE TOOL WITH NEWER OPTIONS)!! ⚡**
+We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the [section](#build-new-features)(#run-new-features-and-options).
+**⚡ UPGRADE TO LATEST OS!! ⚡**
 We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the [section](#run-in-latest-oS-versions).
 
 ## Basic Requirements
@@ -46,13 +49,6 @@ Once you ensure your public  keys are configured, you an clone the repository re
 git clone --recursive https://github.com/vidyalakshmir/SysPartCode.git
 ```
 
-#### Run in latest OS versions
-The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04. Please issue the following commands for the upgrade
-```
-cd SysPartCode/analysis/tools/egalito
-git checkout egalito-upgrade
-```
-
 ### Install all dependencies
 
 ```
@@ -61,14 +57,43 @@ sudo apt-get install make g++ libreadline-dev gdb lsb-release unzip libc6-dbg li
 sudo apt install libunwind-dev python3
 ```
 
+### Build new features
+If you want to use the newly added features of the tool including scalability updates and other additional features, please checkout the following git branch
+
+```
+git checkout new-features
+```
+
 ### Building the tool
+#### Older versions until Ubuntu 18.04
 
 ```
 ./build.sh
 ```
 
-## Using the tool
+#### Run in latest OS versions
+The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04. Please issue the following commands for the upgrade
+```
+./build_upgraded_egalito.sh
+```
 
+## Using the tool
+### Run new features and options
+**To generate callgraph and compute system calls of a binary**
+
+Please make sure you are on the `new-features` branch of the git repository and have build it correctly. 
+
+In order to obtain the system calls of a ELF binary reachable from a list of system calls, use the following command
+
+`cd analysis/app
+src/scripts/compute_syscalls.sh $BINARY $OUT $STARTFILE --log`
+
+where $BINARY is the ELF binary to be analyzed
+      $OUT is the directory where output files will be stored
+      $STARTFILE is the file containing a list of start functions
+      --log is optional parameter that logs the paths from start functions to the system calls in logfile.txt within the output directory
+
+This will output the callgraph as well the system calls in different files. To get more information about the script,please run the script with --help option.`
 
 ### Generate callgraph 
 Uses static analysis to generate the callgraph of the application as well as its dependent libraries.

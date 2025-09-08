@@ -9,7 +9,8 @@ We update this repository to add more features and fix bugs. In case of any quer
 
 ## Upgrades and fixes
 **⚡ LATEST UPDATE (SCALABLE TOOL WITH NEWER OPTIONS)!! ⚡**
-We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the [section](#build-new-features)(#run-new-features-and-options).
+We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the [section](#build-new-features) and [section](#run-new-features-and-options).
+
 **⚡ UPGRADE TO LATEST OS!! ⚡**
 We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the [section](#run-in-latest-oS-versions).
 

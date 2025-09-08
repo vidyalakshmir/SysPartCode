@@ -910,7 +910,7 @@ void IPCallGraph::printCallGraphWithCallsites()
                         auto offset = c.first - (n.first)->getAddress();
                         for(auto nn : c.second)
                         {
-                                cout<<"DIRECT "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                                cout<<"DIRECT "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                         }
                 }
                 for(auto c :node->getIndirectChildren())
@@ -921,7 +921,7 @@ void IPCallGraph::printCallGraphWithCallsites()
 				//cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                                 for(auto nn : c.second)
                                 {
-                                        cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                                        cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                                 }
                         }
                         else
@@ -929,7 +929,7 @@ void IPCallGraph::printCallGraphWithCallsites()
 			//cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                         for(auto nn : c.second)
                         {
-                                cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<endl;
+                                cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                         }
                         }
                 }

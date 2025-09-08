@@ -12,12 +12,12 @@ We update this repository to add more features and fix bugs. In case of any quer
 We have introduced new features, including improved scalability to handle larger binaries more efficiently, as well as added scripts that simplify and accelerate the analysis process. For more information, please see the sections [build new features](#build-new-features) and [run new features and options](#run-new-features-and-options).
 
 **⚡ UPGRADE TO LATEST OS!! ⚡**
-We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the section [run in latest OS versions](#run-in-latest-oS-versions).
+We have upgraded SysPart for use in latest ubuntu versions. (ubuntu 18.04+). We have tested in ubuntu 22.04. Please find more info about how to upgrade in the section [run in latest OS versions](#in-latest-os-versions).
 
 ## Basic Requirements
 - Works on **linux binaries (ELF)** which run on **x86-64** architecture
 - Tested with **ELF binaries with symbols** (application as well as libraries). It will work with stripped binaries, only that the results (like callgraph) might be overapproximated.
-- The tool was initially tested on **Ubuntu 18.04** and currently we have upgraded to later versions having been tested in ubuntu 22.04. Refer [section](#run-in-latest-oS-versions) to upgrade the repo for the latest ubuntu.
+- The tool was initially tested on **Ubuntu 18.04** and currently we have upgraded to later versions having been tested in ubuntu 22.04. Refer [run in latest OS versions](#in-latest-os-versions) to upgrade the repo for the latest ubuntu.
 
 ## Capabilities of the tool
 ### Any application
@@ -65,14 +65,14 @@ If you want to use the newly added features of the tool including scalability up
 git checkout new-features
 ```
 
-### Building the tool
+### Building the tool 
 #### Older versions until Ubuntu 18.04
 
 ```
 ./build.sh
 ```
 
-#### Run in latest OS versions
+#### In latest OS versions
 The initial repo was tested in ubuntu 18.04. We have upgraded it to work on latest ubuntu versions. As of now, we have tested on ubuntu 22.04. Please issue the following commands for the upgrade
 ```
 ./build_upgraded_egalito.sh
@@ -84,17 +84,21 @@ The initial repo was tested in ubuntu 18.04. We have upgraded it to work on late
 
 Please make sure you are on the `new-features` branch of the git repository and have build it correctly. 
 
-In order to obtain the system calls of a ELF binary reachable from a list of system calls, use the following command
+In order to obtain the system calls of a ELF binary and its dependent libraries reachable from a list of system calls, use the following command
 
-`cd analysis/app
+```
+cd analysis/app
 src/scripts/compute_syscalls.sh $BINARY $OUT $STARTFILE --log`
 
 where $BINARY is the ELF binary to be analyzed
-      $OUT is the directory where output files will be stored
+      $OUT is the directory where output files will be stored (output directory)
       $STARTFILE is the file containing a list of start functions
       --log is optional parameter that logs the paths from start functions to the system calls in logfile.txt within the output directory
+```
 
-This will output the callgraph as well the system calls in different files. To get more information about the script,please run the script with --help option.`
+This will produce the callgraph as well the reachable system calls in different files within the output directory. To get more information about the script, please run the script `compute_syscalls.sh` with --help option.
+
+This does not produce results of dynamic libraries. Please refer to section [Dynamic Library Profiling](#dynamic-library-profiling) for more info.
 
 ### Generate callgraph 
 Uses static analysis to generate the callgraph of the application as well as its dependent libraries.

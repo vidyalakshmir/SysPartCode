@@ -5,6 +5,9 @@
 #include<sstream>
 using namespace std;
 
+#include <chrono> 
+using namespace std::chrono; 
+
 #include "chunk/link.h"
 #include "instr/linked-x86_64.h"
 #include "ipcallgraph.h"
@@ -839,6 +842,7 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 
 void IPCallGraph::printCallGraphWithCallsites()
 {
+	auto start = high_resolution_clock::now();
         for(auto n: nodeMap)
         {
                 auto node = n.second;
@@ -872,6 +876,9 @@ void IPCallGraph::printCallGraphWithCallsites()
                         }
                 }
         }
+	auto stop = high_resolution_clock::now();
+	auto duration = duration_cast<seconds>(stop - start);
+	std::cerr << "Print call graph edges: "<<std::dec<<duration.count() <<" seconds" << endl;
 }
 
 void IPCallGraph::pruneIndirectEdges(IPCallGraphNode* node)
@@ -1997,7 +2004,7 @@ void IPCallGraph::generate()
 {
 	checkForSymbols();
 	findData();
-
+	auto start = high_resolution_clock::now();
 	while(!functionRoots.empty())
 	{
 		auto next = functionRoots.front();
@@ -2005,8 +2012,11 @@ void IPCallGraph::generate()
 		functionRootSet.erase(next);
 		findDirectEdges(next);
 	}
-
+	auto stop = high_resolution_clock::now();
+	auto duration = duration_cast<seconds>(stop - start);
+	std::cerr << "Direct Edges computation: "<<std::dec<<duration.count() <<" seconds" << endl;
 	LOG(1,"SIZE OF VISITED DIRECT "<<visited_direct.size());
+	start = high_resolution_clock::now();
 	for (Function* func : visited_direct) {
     		LOG(1,"ADD VISITED DIRECT FUNC AS ROOT "<<func->getName());
 		addFunctionRoot(func);
@@ -2019,7 +2029,11 @@ void IPCallGraph::generate()
 		functionRootSet.erase(next);
 		findATList(next);
 	}
+	stop  = high_resolution_clock::now();
+	duration = duration_cast<seconds>(stop - start);
+	std::cerr << "AT List computation: "<<std::dec<<duration.count() <<" seconds" << endl;
 
+	start = high_resolution_clock::now();
 	if(icanalysisFlag)
 	{
 		SyspartUtility spUtil(program, this,1);
@@ -2038,19 +2052,23 @@ void IPCallGraph::generate()
 			}
 		}while(resolved);
 	}
+	stop = high_resolution_clock::now();
+	duration = duration_cast<seconds>(stop - start);
+	std::cerr << "Indirect call target resolution:  "<<std::dec<<duration.count() <<" seconds" << endl;
 	if(typeArmorFlag)
 	{
 	    parseTypeArmor();	
 	   
 	}
+	start = high_resolution_clock::now();
 	for(auto n : nodeMap)
 	{
 		generateIndirectEdges(n.second);
 		
 	}
-	
-	
-	
+	stop = high_resolution_clock::now();
+	duration = duration_cast<seconds>(stop - start);
+	std::cerr << "Generate indirect call targets: "<<std::dec<<duration.count() <<" seconds" << endl;
 }
 
 void IPCallGraph::checkForSymbols()

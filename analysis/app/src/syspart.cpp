@@ -663,8 +663,7 @@ bool Syspart::findFunctionsReachable(address_t addr, Function* func, string end)
             auto d_iter = direct_ch.find(instr->getAddress());
             if(d_iter != direct_ch.end())
             {
-                auto ipset = d_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(d_iter->second))
                 {
                     stack_of_nodes.push(ip);
 		    cout<<ip->getFunction()->getName()<<" direct child of " << func->getName() <<" pushed to stack "<<endl;
@@ -680,7 +679,7 @@ bool Syspart::findFunctionsReachable(address_t addr, Function* func, string end)
             if(ind_iter != indirect_ch.end())
             {
                 auto ipset = ind_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(ind_iter->second))
                 {
                     stack_of_nodes.push(ip);
 		    cout<<ip->getFunction()->getName()<<" indirect child of " << func->getName() <<" pushed to stack "<<endl;
@@ -877,8 +876,7 @@ set<int> Syspart::findSyscallsAccessible(address_t addr, Function* f)
             auto d_iter = direct_ch.find(instr->getAddress());
             if(d_iter != direct_ch.end())
             {
-                auto ipset = d_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(d_iter->second))
                 {
                     auto sy = syscall_mapping.find(ip);
                     if(sy == syscall_mapping.end())
@@ -893,8 +891,7 @@ set<int> Syspart::findSyscallsAccessible(address_t addr, Function* f)
             auto ind_iter = indirect_ch.find(instr->getAddress());
             if(ind_iter != indirect_ch.end())
             {
-                auto ipset = ind_iter->second;
-                for(auto ip : ipset)
+                for(auto ip : *(ind_iter->second))
                 {
                     auto sy = syscall_mapping.find(ip);
                     if(sy == syscall_mapping.end())
@@ -1043,8 +1040,7 @@ set<Function*> Syspart::getThreadStartFunction()
         for(auto d : direct_ch)
         {
             auto addr = d.first;
-            auto children = d.second;
-            for(auto ch : children)
+            for(auto ch : *(d.second))
             {
                 auto t_name = ch->getFunction()->getName();
                 if(t_name.find("pthread_create") != string::npos)
@@ -1076,8 +1072,7 @@ set<Function*> Syspart::getThreadStartFunction()
         for(auto d : indirect_ch)
         {
             auto addr = d.first;
-            auto children = d.second;
-            for(auto ch : children)
+            for(auto ch : *(d.second))
             {
                 auto t_name = ch->getFunction()->getName();
                 if(t_name.find("pthread_create") != string::npos)
@@ -1167,8 +1162,7 @@ void Syspart::find_syscalls_in_thread(bool direct, bool icanalysisFlag, bool typ
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         auto sy = syscall_mapping.find(ip);
                         if(sy == syscall_mapping.end())
@@ -1181,8 +1175,7 @@ void Syspart::find_syscalls_in_thread(bool direct, bool icanalysisFlag, bool typ
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                    auto ipset = ind_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(ind_iter->second))
                     {
                         auto sy = syscall_mapping.find(ip);
                         if(sy == syscall_mapping.end())
@@ -1822,8 +1815,7 @@ void Syspart::getPartitionSize(bool direct, bool icanalysisFlag, bool typearmorF
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
                             fStack.push(ip->getFunction());
@@ -1832,8 +1824,7 @@ void Syspart::getPartitionSize(bool direct, bool icanalysisFlag, bool typearmorF
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                    auto ipset = ind_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(ind_iter->second))
                     {
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
                             fStack.push(ip->getFunction());
@@ -2166,8 +2157,7 @@ void Syspart::syscallsOfMainLoop(bool icanalysisFlag, bool typearmorFlag, string
                 auto d_iter = direct_ch.find(instr->getAddress());
                 if(d_iter != direct_ch.end())
                 {
-                    auto ipset = d_iter->second;
-                    for(auto ip : ipset)
+                    for(auto ip : *(d_iter->second))
                     {
                         //cout<<"direct func  "<<ip->getFunction()<<endl;
                         if(visitedPartitionFns.find(ip->getFunction()) == visitedPartitionFns.end())
@@ -2177,9 +2167,8 @@ void Syspart::syscallsOfMainLoop(bool icanalysisFlag, bool typearmorFlag, string
                 auto ind_iter = indirect_ch.find(instr->getAddress());
                 if(ind_iter != indirect_ch.end())
                 {
-                  auto ipset = ind_iter->second;
                  //cout<<"IND "<<std::hex<<instr->getAddress()<<" "<<endl;
-                 for(auto ip : ipset)
+                 for(auto ip : *(ind_iter->second))
                  {
                     //cout<<"indirect func  "<<ip->getFunction()<<endl;
 
@@ -2464,13 +2453,13 @@ void Syspart::printAICT(bool icanalysisFlag, bool typearmorFlag)
         auto indirect_ch  = node->getIndirectChildren();
         auto mod_node = node->getFunction()->getParent()->getParent();
 
-        for(auto ind : indirect_ch)
+        for(const auto& ind : indirect_ch)
         {
-            sum += (ind.second).size();
+            sum += (ind.second)->size();
             n++;
             if(mod_node->getName() == "module-(executable)")
             {
-                sumapp += (ind.second).size();
+                sumapp += (ind.second)->size();
                 napp++;
             }
         }
@@ -2797,23 +2786,28 @@ void Syspart::getSyscallsFromDlsym(bool direct, bool icanalysisFlag, bool typear
     if(moreAT.size() > 0)
     {
         cout<<"Updating"<<endl;
-        for(auto f : ip_callgraph.nodeMap)
-        {
-            auto ipnode = f.second;
-            auto indirect_children = ipnode->getIndirectChildren();
-            for(auto ind : indirect_children)
-            {
-                auto addr = ind.first;
-                auto node_set = ind.second;
-                for(auto at : moreAT)
-                {
-                    node_set.insert(at);
-                }
-                ind.second = node_set;
-                ipnode->updateIndirectChildren(addr,node_set);
-            }
-        }
-    }  
+	
+	for (auto& f : ip_callgraph.nodeMap)  // auto& to avoid copying
+	{
+	    auto ipnode = f.second;
+	    auto indirect_children = ipnode->getIndirectChildren();  // reference to map
+
+	    for (auto& ind : indirect_children)  // auto& to modify via updateIndirectChildren
+    	    {
+        	auto addr = ind.first;
+	        auto& node_vec_ptr = ind.second;     // shared_ptr<const vector<IPCallGraphNode*>>
+        	auto& node_vec = *node_vec_ptr;      // dereference to get vector
+
+	        // Create a new vector with existing nodes + moreAT
+        	std::set<IPCallGraphNode*> merged(node_vec.begin(), node_vec.end());
+	        merged.insert(moreAT.begin(), moreAT.end());
+
+        	// Update the indirect children using ChildListManager
+	        ipnode->updateIndirectChildren(addr, merged);
+    	    }
+	}
+   }
+
     //ip_callgraph.printCallGraph();
     cout<<"Finding direct system calls"<<endl;
     findDirectSyscalls();

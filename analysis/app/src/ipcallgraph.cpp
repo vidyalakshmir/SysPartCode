@@ -32,129 +32,64 @@ using namespace std;
 
 void IPCallGraphNode::insertCallTarget(address_t iaddr, bool isDirect, IPCallGraphNode* t)		
 {
-	if(isDirect)
-	{
-		auto child_iter = direct_children.find(iaddr);
-		if(child_iter != direct_children.end())
-		{
-			auto call_targets = (child_iter)->second;
-			(call_targets).insert(t);
-			direct_children[iaddr] = call_targets;
+	auto& childrenMap = isDirect ? direct_children : indirect_children;
 
-		}
-		else
-		{
-			set<IPCallGraphNode*> call_targets;
-			(call_targets).insert(t);
-			direct_children[iaddr] = call_targets;
-		}
+	auto it = childrenMap.find(iaddr);
+
+	if(it != childrenMap.end())
+	{
+		childrenMap[iaddr] = listManager.addChild(it->second, t);
 	}
 	else
 	{
-		auto child_iter = indirect_children.find(iaddr);
-		if(child_iter != indirect_children.end())
-		{
-			auto call_targets = (child_iter)->second;
-			(call_targets).insert(t);
-			indirect_children[iaddr] = call_targets;
-
-		}
-		else
-		{
-			set<IPCallGraphNode*> call_targets;
-			(call_targets).insert(t);
-			indirect_children[iaddr] = call_targets;
-		}
+		childrenMap[iaddr] = listManager.getOrCreate({t});
 	}
 }
 
 void IPCallGraphNode::insertCallTargetSet(address_t iaddr, bool isDirect, set<IPCallGraphNode*> t)
 {
-	if(isDirect)
-	{
-		auto child_iter = direct_children.find(iaddr);
-		if(child_iter != direct_children.end())
-		{
-			auto call_targets = (child_iter)->second;
-			(call_targets).insert(t.begin(), t.end());
-			direct_children[iaddr] = call_targets;
+	auto& childrenMap = isDirect ? direct_children : indirect_children;
+	std::vector<IPCallGraphNode*> newChildren(t.begin(), t.end());
 
-		}
-		else
-		{
-			direct_children[iaddr] = t;
-		}
+	auto it = childrenMap.find(iaddr);
+
+	if(it != childrenMap.end())
+	{
+		std::vector<IPCallGraphNode*> merged(*it->second);
+		merged.insert(merged.end(), newChildren.begin(), newChildren.end());
+		childrenMap[iaddr] = listManager.getOrCreate(merged);
 	}
 	else
 	{
-		auto child_iter = indirect_children.find(iaddr);
-		if(child_iter != indirect_children.end())
-		{
-			auto call_targets = (child_iter)->second;
-			(call_targets).insert(t.begin(), t.end());
-			indirect_children[iaddr] = call_targets;
-
-		}
-		else
-		{
-			indirect_children[iaddr] = t;
-		}
+		childrenMap[iaddr] = listManager.getOrCreate(newChildren);
 	}
 }
 
 void IPCallGraphNode::removeAllCallTargets(IPCallGraphNode* t)
 {
-	for(auto dir : direct_children)
+	for (auto& [addr, childListPtr] : direct_children)
 	{
-		auto children = dir.second;
-		auto child_iter = (children).find(t);
-		if (child_iter != children.end())
-		{
-			LOG(20, "Found "<<t->getFunction()->getName()<< " in direct children");
-			children.erase(child_iter);
-		}
-		dir.second = children;
+            direct_children[addr] = listManager.removeChild(childListPtr, t);
 	}
 
-	for(auto indir : indirect_children)
+        for (auto& [addr, childListPtr] : indirect_children)
 	{
-		auto children = indir.second;
-		auto child_iter = (children).find(t);
-		if (child_iter != children.end())
-		{
-			LOG(20, "Found "<<t->getFunction()->getName()<< " in indirect children");
-			children.erase(child_iter);
-		}
-		indir.second = children;
+            indirect_children[addr] = listManager.removeChild(childListPtr, t);
 	}
 }
 
 void IPCallGraphNode::removeCallTarget(address_t addr, IPCallGraphNode* t)
 {
-	auto dir_iter = direct_children.find(addr);
-	if(dir_iter != direct_children.end())
+	auto dirIt = direct_children.find(addr);
+        if (dirIt != direct_children.end())
 	{
-		auto children = (dir_iter)->second;
-		auto child_iter = (children).find(t);
-		if (child_iter != children.end())
-		{
-			LOG(20, "Found "<<t->getFunction()->getName()<< " in direct children");
-			children.erase(child_iter);
-		}
-		(dir_iter)->second = children;
+            direct_children[addr] = listManager.removeChild(dirIt->second, t);
 	}
 
-	auto indir_iter = indirect_children.find(addr);
-	if(indir_iter != indirect_children.end())
+        auto indirIt = indirect_children.find(addr);
+        if (indirIt != indirect_children.end());  // remove unused vectors from cache
 	{
-		auto children = (indir_iter)->second;
-		auto child_iter = (children).find(t);
-		if (child_iter != children.end())
-		{
-			LOG(20, "Found "<<t->getFunction()->getName()<< " in indirect children");
-			children.erase(child_iter);
-		}
-		(indir_iter)->second = children;
+            indirect_children[addr] = listManager.removeChild(indirIt->second, t);
 	}
 }
 
@@ -211,23 +146,28 @@ void IPCallGraphNode::insertParent(address_t addr, IPCallGraphNode* p, bool type
 set<IPCallGraphNode*> IPCallGraphNode::getAllCallTargets()
 {
 	set<IPCallGraphNode*> s;
-	for(auto c : direct_children)
-	{
-		s.insert((c.second).begin(), (c.second).end());
-	}
-	for(auto c : indirect_children)
-	{
-		s.insert((c.second).begin(), (c.second).end());
-	}
+	for (auto& c : direct_children)
+    	{
+        	auto& vec = *(c.second);          // dereference shared_ptr
+        	s.insert(vec.begin(), vec.end()); // insert all elements into set
+    	}
+
+    	// Indirect children
+    	for (auto& c : indirect_children)
+    	{
+        	auto& vec = *(c.second);
+        	s.insert(vec.begin(), vec.end());
+    	}
 	return s;
 }
 
 set<IPCallGraphNode*> IPCallGraphNode::getDirectCallTargets()
 {
 	set<IPCallGraphNode*> s;
-	for(auto c : direct_children)
+	for(auto&c : direct_children)
 	{
-		s.insert((c.second).begin(), (c.second).end());
+		auto& vec = *(c.second);
+		s.insert(vec.begin(), vec.end());
 	}
 	return s;
 }
@@ -314,7 +254,7 @@ void IPCallGraph::addEdge(address_t addr, Function* start, Function* end, bool i
 
 	if(start_iter == nodeMap.end())
 	{
-		start_node = new IPCallGraphNode(start);
+		start_node = new IPCallGraphNode(start, listManager);
 		df.getWorkingSet(start);
 		nodeMap[start] = start_node;
 
@@ -324,7 +264,7 @@ void IPCallGraph::addEdge(address_t addr, Function* start, Function* end, bool i
 
 	if(end_iter == nodeMap.end())
 	{
-		end_node = new IPCallGraphNode(end);
+		end_node = new IPCallGraphNode(end, listManager);
 		df.getWorkingSet(end);
 
 		nodeMap[end] = end_node;
@@ -346,7 +286,7 @@ void IPCallGraph::addATFunction(address_t addr, Function* start, Function* ATfun
 
 	if(start_iter == nodeMap.end())
 	{
-		start_node = new IPCallGraphNode(start);
+		start_node = new IPCallGraphNode(start, listManager);
 		df.getWorkingSet(start);
 		LOG(15,start<<" "<<start_node<<" "<<std::hex<<start->getAddress()<<" "<<start->getName());
 		nodeMap[start] = start_node;
@@ -356,7 +296,7 @@ void IPCallGraph::addATFunction(address_t addr, Function* start, Function* ATfun
 
 	if(ATfunc_iter == nodeMap.end())
 	{
-		ATfunc_node = new IPCallGraphNode(ATfunc);
+		ATfunc_node = new IPCallGraphNode(ATfunc, listManager);
 		df.getWorkingSet(ATfunc);
 		LOG(15, ATfunc<<" "<<ATfunc_node<<" "<<std::hex<<ATfunc->getAddress()<<" "<<ATfunc->getName());
 
@@ -375,7 +315,7 @@ void IPCallGraph::addIndirectSource(address_t addr, Function* func)
 	IPCallGraphNode* n;
 	if(f_iter == nodeMap.end())
 	{
-		n = new IPCallGraphNode(func);
+		n = new IPCallGraphNode(func, listManager);
 		df.getWorkingSet(func);
 		LOG(15, func<<" "<<n<<" "<<std::hex<<func->getAddress()<<" "<<func->getName());
 
@@ -397,18 +337,18 @@ void IPCallGraph::printCallGraphofApplication()
 		auto module = (n.first)->getParent()->getParent();
 		if(module->getName() != "module-(executable)")
 			continue;
-		for(auto c : node->getDirectChildren())
+		for(const auto &c : node->getDirectChildren())
 		{
-			cfg_tot+=(c.second).size();
+			cfg_tot+=(c.second)->size();
 		}
-		for(auto c : node->getIndirectChildren())
+		for(const auto &c : node->getIndirectChildren())
 		{
-			cfg_tot+=(c.second).size();
+			cfg_tot+=(c.second)->size();
 		}
 		auto target_set  = node->getAllCallTargets();
 		fcg_tot += target_set.size();
 		
-		for(auto t : target_set)
+		for(const auto &t : target_set)
 		{	
 			i++;		
 			cout<<std::hex<<(n.first)->getName() << " " << (n.first)->getAddress() << " (" << (n.first)->getParent()->getParent()->getName() << ") -> " << std::hex<<t->getFunction()->getName()<< " " << t->getFunction()->getAddress() << " (" << t->getFunction()->getParent()->getParent()->getName() << ")" <<endl;
@@ -439,20 +379,20 @@ void IPCallGraph::printCallGraph()
 	for(auto n : nodeMap)
 	{
 		auto node = n.second;
-		for(auto c : node->getDirectChildren())
+		for(const auto& c : node->getDirectChildren())
 		{
-			cfg_tot+=(c.second).size();
+			cfg_tot+=(c.second)->size();
 		}
-		for(auto c : node->getIndirectChildren())
+		for(const auto& c : node->getIndirectChildren())
 		{
-			cfg_tot+=(c.second).size();
-			tot_ic_target += (c.second).size();
+			cfg_tot+=(c.second)->size();
+			tot_ic_target += (c.second)->size();
 			tot_ic_callsites++;
 		}
 		auto target_set  = node->getAllCallTargets();
 		fcg_tot += target_set.size();
 		
-		for(auto t : target_set)
+		for(const auto& t : target_set)
 		{	
 			i++;		
 			cout<<std::hex<<(n.first)->getName() << " " << (n.first)->getAddress() << " (" << (n.first)->getParent()->getParent()->getName() << ") -> " << std::hex<<t->getFunction()->getName()<< " " << t->getFunction()->getAddress() << " (" << t->getFunction()->getParent()->getParent()->getName() << ")" <<endl;
@@ -477,14 +417,13 @@ void IPCallGraph::printIndirectEdges()
 	for(auto n : nodeMap)
 	{
 		auto node = n.second;
-		auto indirect_ch  = node->getIndirectChildren();
 		set<IPCallGraphNode*> target_set;
-		for(auto ind : indirect_ch)
+		for(const auto& ind : node->getIndirectChildren())
 		{
-			auto indirect_set = ind.second;
-			target_set.insert(indirect_set.begin(), indirect_set.end());
+			auto&indirect_vec = *(ind.second);
+			target_set.insert(indirect_vec.begin(), indirect_vec.end());
 		}
-		for(auto t : target_set)
+		for(const auto& t : target_set)
 		{	
 			i++;		
 			cout<<std::hex<<(n.first)->getName() << " " << (n.first)->getAddress() << " (" << (n.first)->getParent()->getParent()->getName() << ") -> " << std::hex<<t->getFunction()->getName()<< " " << t->getFunction()->getAddress() << " (" << t->getFunction()->getParent()->getParent()->getName() << ")" <<endl;
@@ -499,14 +438,13 @@ void IPCallGraph::printDirectEdges()
 	for(auto n : nodeMap)
 	{
 		auto node = n.second;
-		auto direct_ch  = node->getDirectChildren();
 		set<IPCallGraphNode*> target_set;
-		for(auto d : direct_ch)
+		for(const auto& d : node->getDirectChildren())
 		{
-			auto direct_set = d.second;
-			target_set.insert(direct_set.begin(), direct_set.end());
+			auto& direct_vec = *(d.second);
+			target_set.insert(direct_vec.begin(), direct_vec.end());
 		}
-		for(auto t : target_set)
+		for(const auto& t : target_set)
 		{	
 			i++;		
 			cout<<std::hex<<(n.first)->getName() << " " << (n.first)->getAddress() << " (" << (n.first)->getParent()->getParent()->getName() << ") -> " << std::hex<<t->getFunction()->getName()<< " " << t->getFunction()->getAddress() << " (" << t->getFunction()->getParent()->getParent()->getName() << ")" <<endl;
@@ -802,7 +740,7 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 		IPCallGraphNode* node_f;
 		if(node_iter == nodeMap.end())
 		{
-			node_f = new IPCallGraphNode(f);
+			node_f = new IPCallGraphNode(f, listManager);
 			df.getWorkingSet(f);
 			LOG(15, f<<" "<<node_f<<" "<<std::hex<<f->getAddress()<<" "<<f->getName());
 			nodeMap[f] = node_f;
@@ -834,7 +772,7 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 							if(i.first != addr)
 								continue;
 
-							for(auto ict : i.second)
+							for(auto ict : *(i.second))
 							{
 								totResolvedIcTarget++;
 							}
@@ -871,7 +809,7 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
                                                 {
                                                         if(i.first != addr)
                                                                 continue;
-                                                        for(auto ict : i.second)
+                                                        for(auto ict : *(i.second))
                                                         {
                                                                 totResolvedIcTarget++;
                                                         }
@@ -905,21 +843,21 @@ void IPCallGraph::printCallGraphWithCallsites()
         {
                 auto node = n.second;
                 auto mod = (n.first)->getParent()->getParent()->getName();
-                for(auto c : node->getDirectChildren())
+                for(const auto& c : node->getDirectChildren())
                 {
                         auto offset = c.first - (n.first)->getAddress();
-                        for(auto nn : c.second)
+                        for(auto nn : *(c.second))
                         {
                                 cout<<"DIRECT "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                         }
                 }
-                for(auto c :node->getIndirectChildren())
+                for(const auto& c :node->getIndirectChildren())
                 {
 
                         if(node->isIcallResolved(c.first))
                         {
 				//cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
-                                for(auto nn : c.second)
+                                for(auto nn : *(c.second))
                                 {
                                         cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                                 }
@@ -927,7 +865,7 @@ void IPCallGraph::printCallGraphWithCallsites()
                         else
                         {
 			//cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
-                        for(auto nn : c.second)
+                        for(auto nn : *(c.second))
                         {
                                 cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                         }
@@ -938,29 +876,34 @@ void IPCallGraph::printCallGraphWithCallsites()
 
 void IPCallGraph::pruneIndirectEdges(IPCallGraphNode* node)
 {
-	
-                auto  module = node->getFunction()->getParent()->getParent();
-                auto indirect_children = node->getIndirectChildren();
+    auto module = node->getFunction()->getParent()->getParent();
+    auto indirect_children = node->getIndirectChildren();  // reference
 
-                for(auto ind : indirect_children)
-                {
-                	auto addr = ind.first;
-                	auto node_set = ind.second;
-                	set<IPCallGraphNode*> s;
-                	for(auto nn : node_set)
-                	{
+    for (auto& ind : indirect_children)   // & avoids copy
+    {
+        auto addr = ind.first;
+        auto& node_vec_ptr = ind.second;  // of type shared_ptr<const vector<IPCallGraphNode*>>
+        auto& node_vec = *node_vec_ptr;   // dereferences to access the vector
 
-                		auto mod = nn->getFunction()->getParent()->getParent();
-                		if(module->getName() == mod->getName())
-                			s.insert(nn);
-                		else
-                			nn->removeParent(node);
-                	}
-                	ind.second = s;
-                	node->updateIndirectChildren(addr,s);
-                }
-	
+        std::set<IPCallGraphNode*> s;  // new pruned vector
+        for (auto* nn : node_vec)
+        {
+            auto mod = nn->getFunction()->getParent()->getParent();
+            if (module->getName() == mod->getName())
+            {
+                s.insert(nn);  // keep it
+            }
+            else
+            {
+                nn->removeParent(node);  // remove parent from other module
+            }
+        }
+
+        // Update the map entry using the ChildListManager
+        node->updateIndirectChildren(addr, s);
+    }
 }
+
 
 void IPCallGraph::generateIndirectEdgesWithTypeArmor(IPCallGraphNode* n, address_t addr, set<IPCallGraphNode*> at)
 {
@@ -1128,7 +1071,7 @@ bool IPCallGraph::handleArgumentFnPtr(int reg, Function* f, Instruction* instr, 
 	return false;
     }
     // Loop through all functions called at this site
-    for (auto s : it->second)
+    for (auto s : *(it->second))
     {
         auto ch_func = s->getFunction();
         LOG(1,"FDF ARGS_EXAMINING_FUNC "<<atfunc->getName()<<" "<<ch_func->getName());

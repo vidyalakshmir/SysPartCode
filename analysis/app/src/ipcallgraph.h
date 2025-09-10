@@ -2,6 +2,11 @@
 #define IPCALLGRAPH_ANALYSIS
 
 #include <unordered_set>
+#include <unordered_map>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <iostream>
 
 #include "instr/linked-x86_64.h"
 #include "conductor/setup.h"
@@ -10,13 +15,104 @@
 #include "analysis/dataflow.h"
 #include "nss.h"
 
+class IPCallGraphNode;
+
+struct VectorHash	//A functor which is a callable object (type)
+{
+	size_t operator()(const std::vector<IPCallGraphNode*>& v) const
+	{
+		size_t h = 0;
+		for(auto* ptr : v)
+		{
+			h ^= std::hash<IPCallGraphNode*>()(ptr) + 0x9e3779b9 + (h << 6) + (h >> 2); //Hash combine from boost
+		}
+	        return h;
+	}
+};
+
+struct VectorEqual    //A functor which is a callable object (type)
+{
+	bool operator()(const std::vector<IPCallGraphNode*>& a, const std::vector<IPCallGraphNode*>& b) const
+	{
+		return a == b;
+	}
+};
+
+class ChildListManager {
+
+	public:
+		using ChildListPtr = std::shared_ptr<const std::vector<IPCallGraphNode*>>;
+
+		ChildListPtr getOrCreate(const std::vector<IPCallGraphNode*>& vec)
+		{
+			auto it = cache.find(vec);
+
+			if(it != cache.end())
+			{
+				return it->second;
+			}
+			else
+			{
+				auto sharedp = std::make_shared<const std::vector<IPCallGraphNode*>>(vec);	//Creates a shared pointer that points to vec
+				cache[*sharedp] = sharedp;	//*sharedp dereferences the shared pointer and gives the vector (vec)
+				return sharedp;
+			}
+		}
+
+		ChildListPtr addChild(const ChildListPtr& oldList, IPCallGraphNode* child)
+		{
+			std::vector<IPCallGraphNode*> newVec(*oldList);
+			newVec.push_back(child);
+			return getOrCreate(newVec);
+		}
+
+		ChildListPtr removeChild(const ChildListPtr& oldList, IPCallGraphNode* child)
+		{
+			std::vector<IPCallGraphNode*> newVec;
+			for(IPCallGraphNode* n : *oldList)
+			{
+				if(n != child)
+				{
+					newVec.push_back(n);
+				}
+			}
+			return getOrCreate(newVec);
+		}
+
+		void cleanupCache() 
+		{
+     		   for (auto it = cache.begin(); it != cache.end(); ) 
+		   {
+            		if (it->second.use_count() == 1) 
+			{
+                		// Only referenced by cache itself safe to remove
+                		it = cache.erase(it);
+   		        } 
+			else 
+			{
+                		++it;
+            		}
+        	   }
+    	       }
+
+	 private:
+                std::unordered_map<std::vector<IPCallGraphNode*>, ChildListPtr, VectorHash, VectorEqual> cache;
+
+};
+
 class IPCallGraphNode
 {
+
+	public:
+		using ChildListPtr = std::shared_ptr<const std::vector<IPCallGraphNode*>>;
 	
+	private:
+
+	ChildListManager& listManager;
 	Function* func;
 	map<address_t,IPCallGraphNode*> parent;
-	map<address_t, set<IPCallGraphNode*>> direct_children; //Functions which are directly called along with the instruction address where it is called
-	map<address_t, set<IPCallGraphNode*>> indirect_children; //Functions which are indirectly called along with the instruction address where it is called
+	map<address_t, ChildListPtr> direct_children; //Functions which are directly called along with the instruction address where it is called
+	map<address_t, ChildListPtr> indirect_children; //Functions which are indirectly called along with the instruction address where it is called
 	set<address_t> indirectCalls; //Instruction with an indirect call
 	map<address_t, set<IPCallGraphNode*>> ATFunctions;	//Functions which are address taken(AT) along with the address of the instruction where it is AT
 	int color;
@@ -27,10 +123,7 @@ class IPCallGraphNode
 	std::set<Function*> atreturns;
 	public :
 
-		IPCallGraphNode(Function* f)
-		{
-			func = f;
-		}
+		IPCallGraphNode(Function* f, ChildListManager& mgr) : func(f), listManager(mgr) {}
 		void insertCallTarget(address_t iaddr, bool isDirect, IPCallGraphNode* t);
 		
 		void insertCallTargetSet(address_t iaddr, bool isDirect, set<IPCallGraphNode*> t);
@@ -110,17 +203,18 @@ class IPCallGraphNode
 		
 		map<address_t, set<IPCallGraphNode*>> getATList(); //Get all functions which are AT
 
-		map<address_t, set<IPCallGraphNode*>> getDirectChildren() {
+		map<address_t, ChildListPtr> getDirectChildren() {
 			return direct_children;
 		}
 
-		map<address_t, set<IPCallGraphNode*>> getIndirectChildren(){
+		map<address_t, ChildListPtr> getIndirectChildren(){
 			return indirect_children;
 		}
 
-		void updateIndirectChildren(address_t addr, set<IPCallGraphNode*> s)
+		void updateIndirectChildren(address_t addr, const std::set<IPCallGraphNode*>& s)
 		{
-			indirect_children[addr] = s;
+			std::vector<IPCallGraphNode*> vec(s.begin(), s.end());
+			indirect_children[addr] = listManager.getOrCreate(vec);
 		}
 		/*
 		set<IPCallGraphNode*> getallATFunctions()
@@ -195,6 +289,7 @@ class IPCallGraph
 	int totTypeArmorTarget=0;
 	std::map<std::tuple<int, Function*, Instruction*>, bool> handle_arg_cache;
 	int forwardDfAnalysisType=0;
+	ChildListManager listManager;
 	public:
 	map<Function*, IPCallGraphNode*> nodeMap;
 	void addFunctionRoot(Function* func);

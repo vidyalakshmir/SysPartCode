@@ -398,6 +398,44 @@ void Syspart::findDerivedSyscalls(Function* func)
     }
 }
 
+
+void Syspart::findDerived4()
+{
+	bool changed_in_pass = true;
+	int pass_count = 0;
+
+	while(changed_in_pass)
+	{
+		changed_in_pass = false;
+		pass_count++;
+
+		for(auto i : ip_callgraph.nodeMap)
+		{
+			auto cur_node = i.second;
+			auto cur_iter = syscall_mapping.find(cur_node);
+			if(cur_iter == syscall_mapping.end())
+				continue;
+			auto cur_sys_node = cur_iter->second;
+			std::bitset<350> current_syscalls = (cur_sys_node->syscall_info)[cur_sys_node];
+			//cout<<(i.first)->getName()<<" "<<current_syscalls.to_string()<<endl;
+			for(auto child : cur_node->getAllCallTargets())
+			{
+				auto child_iter = syscall_mapping.find(child);
+				if(child_iter == syscall_mapping.end())
+					continue;
+				auto child_node = child_iter->second;
+				current_syscalls |= (child_node->syscall_info)[child_node];
+			}
+			if( current_syscalls != (cur_sys_node->syscall_info)[cur_sys_node])
+			{
+				(cur_sys_node->syscall_info)[cur_sys_node] = current_syscalls;
+				changed_in_pass = true;
+				//cout<<"CHANGED PASS "<<(i.first)->getName()<<endl;
+			}
+		}
+	}
+}
+
 void Syspart::findDerivedSyscalls3(Function* func)
 {
     bool build_flag = false;

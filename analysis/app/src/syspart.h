@@ -72,6 +72,7 @@ class Syspart
 		void findDerivedSyscalls1(Function *func);
 		void findDerivedSyscalls(Function *func);
 		void findDerivedSyscalls3(Function *func);
+		void findDerived4();
 
 		bitset<350> buildSysCallTree(IPCallGraphNode *n, bool *flag);
 		void getSyscallInfo(Function *func);

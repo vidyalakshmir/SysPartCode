@@ -236,7 +236,50 @@ class IPCallGraphNode
 };
 
 class IPCallGraph
-{	
+{
+	
+	public:
+
+		//Info for the binary representation of callgraph
+		//Header info
+		struct FileHeader 
+		{
+			uint32_t node_count;
+			uint32_t edge_count;
+		};
+
+		//Node info
+		struct NodeInfo 
+		{
+			address_t function_address;
+			std::string module_name;
+			std::string function_name;
+		};
+
+		//Edge info
+		struct EdgeInfo 
+		{
+			uint32_t caller_node_id;
+			address_t callsite_address;
+			uint32_t callee_node_id;
+			uint8_t edge_type;
+		};
+
+		enum class EdgeType : uint8_t
+		{
+			Direct = 0,
+			Indirect = 1,
+			Resolved = 2
+		};
+
+		 //In-memory data structures to represent callgraph
+
+	private:
+                std::map<std::string, uint32_t> node_map;
+                std::vector<NodeInfo> nodes;
+                std::vector<EdgeInfo> edges;
+
+
 	//TypeArmor variables
 	map<Function*, int> functionNargs;
 	set<Function*> nonvoidFn;
@@ -386,6 +429,12 @@ class IPCallGraph
 	bool handleDataLinked(UDState* state, int reg1, Function* atfunc);
 	bool handleRegisterDefinition(UDState* state, int reg1, Function* atfunc, bool& out_result);
 	bool handleMemoryDefinition(UDState* state, int reg1, Function* atfunc);
+
+	//Seriazability functions
+	void buildCallgraphFromBinaryFile(const std::string& filename);
+	void writeCallgraphToBinaryFile();
+	void writeStringToFile(std::ofstream& file, const std::string& str);
+	std::string readStringFromFile(std::ifstream& file); 
 };
 
 #endif

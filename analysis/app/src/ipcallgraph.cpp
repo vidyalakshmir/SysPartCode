@@ -860,18 +860,16 @@ void IPCallGraph::printCallGraphWithCallsites()
 
                         if(node->isIcallResolved(c.first))
                         {
-				//cout<<"IRESOLVEDCALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                                 for(auto nn : *(c.second))
                                 {
-                                        cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
+                                        cout<<"INDIRECT_RESOLVED "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                                 }
                         }
                         else
                         {
-			//cout<<"ICALLSITE "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<endl;
                         for(auto nn : *(c.second))
                         {
-                                cout<<"INDIRECT "<<mod<<" "<<std::hex<<" "<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
+                                cout<<"INDIRECT "<<mod<<" "<<std::hex<<c.first<<" "<<(n.first)->getName()<<" "<<nn->getFunction()->getAddress()<<" "<<nn->getFunction()->getName()<<" "<<nn->getFunction()->getParent()->getParent()->getName()<<" "<<(n.first)->getAddress()<<endl;
                         }
                         }
                 }
@@ -2240,3 +2238,168 @@ void IPCallGraph::addNssEdges()
 
     }
 }
+
+void IPCallGraph::writeCallgraphToBinaryFile()
+{
+	auto start = high_resolution_clock::now();
+	uint32_t next_node_id = 0;
+	
+	 for(auto n: nodeMap)
+        {
+                auto node = n.second;
+		auto caller_name = (n.first)->getName();
+                auto caller_address = (n.first)->getAddress();
+                auto caller_module = (n.first)->getParent()->getParent()->getName();
+                for(const auto& c : node->getDirectChildren())
+                {
+			auto callsite_address = c.first;
+			for(auto nn : *(c.second))
+                        {
+
+				auto callee_name = nn->getFunction()->getName();	
+				auto callee_address = nn->getFunction()->getAddress();
+				auto callee_module = nn->getFunction()->getParent()->getParent()->getName();
+				
+				std::string caller_key = caller_name + "::" + std::to_string(caller_address);
+				std::string callee_key = callee_name + "::" + std::to_string(callee_address);
+
+				if(node_map.find(caller_key) == node_map.end())
+				{
+					node_map[caller_key] = next_node_id++;
+					nodes.push_back({caller_address, caller_module, caller_name});
+				}
+
+				if(node_map.find(callee_key) == node_map.end())
+                                {
+                                        node_map[callee_key] = next_node_id++;
+                                        nodes.push_back({callee_address, callee_module, callee_name});
+                                }
+				edges.push_back(EdgeInfo{node_map[caller_key], callsite_address, node_map[callee_key], static_cast<uint8_t>(EdgeType::Direct)});
+                        }
+                }
+                for(const auto& c :node->getIndirectChildren())
+                {
+
+				auto callsite_address = c.first;
+                                for(auto nn : *(c.second))
+                                {
+
+					auto callee_name = nn->getFunction()->getName();
+	                                auto callee_address = nn->getFunction()->getAddress();
+        	                        auto callee_module = nn->getFunction()->getParent()->getParent()->getName();
+                	                std::string caller_key = caller_name + "::" + std::to_string(caller_address);
+                        	        std::string callee_key = callee_name + "::" + std::to_string(callee_address);
+
+                                	if(node_map.find(caller_key) == node_map.end())
+	                                {
+        	                                node_map[caller_key] = next_node_id++;
+                	                        nodes.push_back({caller_address, caller_module, caller_name});
+                        	        }
+	
+        	                        if(node_map.find(callee_key) == node_map.end())
+                	                {
+                        	                node_map[callee_key] = next_node_id++;
+                                	        nodes.push_back({callee_address, callee_module, callee_name});
+                                	}
+					if(node->isIcallResolved(c.first))
+					{
+	                                	edges.push_back(EdgeInfo{node_map[caller_key], callsite_address, node_map[callee_key], static_cast<uint8_t>(EdgeType::Resolved)});
+					}
+					else
+					{
+						edges.push_back(EdgeInfo{node_map[caller_key], callsite_address, node_map[callee_key], static_cast<uint8_t>(EdgeType::Indirect)});
+					}
+                                }
+                }
+        }
+    std::string output_filename = "callgraph.bin";
+    std::ofstream file(output_filename, std::ios::binary | std::ios::out);
+    if (!file) {
+        throw std::runtime_error("Could not open file for writing: " + output_filename);
+    }
+
+    // 1. Write the file header.
+    FileHeader header = { (uint32_t)nodes.size(), (uint32_t)edges.size() };
+    file.write(reinterpret_cast<const char*>(&header), sizeof(header));
+
+    // 2. Write the Node Table.
+    for (const auto& node : nodes) {
+        file.write(reinterpret_cast<const char*>(&node.function_address), sizeof(node.function_address));
+   	writeStringToFile(file, node.module_name);
+        writeStringToFile(file, node.function_name);
+    }
+
+    // 3. Write the Edge List.
+    file.write(reinterpret_cast<const char*>(edges.data()), edges.size() * sizeof(EdgeInfo));
+
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<seconds>(stop - start);
+    std::cout << "Successfully wrote " << nodes.size() << " nodes and " << edges.size() << " edges to " << output_filename <<" in "<<std::dec<<duration.count() <<" seconds" << std::endl;
+
+}
+
+std::string IPCallGraph::readStringFromFile(std::ifstream& file) {
+        uint32_t length;
+        file.read(reinterpret_cast<char*>(&length), sizeof(length));
+	std::string str(length, '\0');
+	file.read(&str[0], length);
+	return str;
+}
+
+void IPCallGraph::writeStringToFile(std::ofstream& file, const std::string& str)
+{
+	uint32_t length = str.length();
+	file.write(reinterpret_cast<const char*>(&length), sizeof(length));
+	file.write(str.c_str(), length);
+}
+
+
+void IPCallGraph::buildCallgraphFromBinaryFile(const std::string& filename)
+{
+	std::ifstream file(filename, std::ios::binary | std::ios::in);
+
+	if(!file)
+	{
+		cout<<"Count not open file for reading: "<<filename;
+	}
+
+	FileHeader header;
+	file.read(reinterpret_cast<char*>(&header), sizeof(header));
+
+	nodes.resize(header.node_count);
+
+	for(uint32_t i=0; i< header.node_count; ++i)
+	{
+		file.read(reinterpret_cast<char*>(&nodes[i].function_address), sizeof(nodes[i].function_address));
+		nodes[i].module_name = readStringFromFile(file);
+		nodes[i].function_name = readStringFromFile(file);
+	}
+
+	std::vector<EdgeInfo> edges(header.edge_count);
+        file.read(reinterpret_cast<char*>(edges.data()), header.edge_count * sizeof(EdgeInfo));
+	for (const auto& edge : edges)
+	{
+		NodeInfo& caller_node = nodes[edge.caller_node_id];
+		address_t caller_address = caller_node.function_address;
+		std::string caller_name = caller_node.function_name;
+		std::string caller_module = caller_node.module_name;
+
+		address_t callsite = edge.callsite_address;
+
+		NodeInfo& callee_node = nodes[edge.callee_node_id];
+		address_t callee_address = callee_node.function_address;
+		std::string callee_name = callee_node.function_name;
+		std::string callee_module = callee_node.module_name;
+
+		std::string edge_type;
+		if(edge.edge_type == 0)
+			edge_type="DIRECT";
+		else if(edge.edge_type == 1)
+			edge_type="INDIRECT";
+		else if(edge.edge_type == 2)
+			edge_type="INDIRECT_RESOLVED";
+		cout<<edge_type<<" "<<caller_module<<" "<<std::hex<<callsite<<" "<<caller_name<<" "<<callee_address<<" "<<callee_name<<" "<<callee_module<<" "<<caller_address<<endl;
+	}	
+
+}
+

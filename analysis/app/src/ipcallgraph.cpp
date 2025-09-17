@@ -733,10 +733,48 @@ set<Function*> IPCallGraph::getFunctionByAddress(address_t addr)
 	}
 	return func_set;
 }
+
+/*
+void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n) {
+    const auto& ics = n->getIndirectCallSites();
+    
+    std::unordered_set<IPCallGraphNode*> s = allAT;
+    
+    const std::string n_module = n->getFunction()->getParent()->getParent()->getName();
+
+    auto processIndirectEdge = [&](uint64_t addr) {
+        nicalls++;
+        if(icanalysisFlag && n->isIcallResolved(addr)) {
+            resolvedIcalls++;
+            for(auto& i : n->getIndirectChildren())
+                if(i.first == addr)
+                    totResolvedIcTarget += i.second.size();
+            return;
+        }
+        n->setIcallResolved(addr, false);
+        if(!typeArmorFlag) {
+            n->insertCallTargetSet(addr, false, s);
+            for(auto node_f : s)
+                node_f->insertParent(addr, n, false);
+        } else {
+            generateIndirectEdgesWithTypeArmor(n, addr, s);
+        }
+    };
+
+    for(auto bl : CIter::children(n->getFunction()))
+        for(auto instr : CIter::children(bl)) {
+            auto addr = instr->getAddress();
+            if(ics.count(addr))
+                processIndirectEdge(addr);
+        }
+}
+*/
+
 void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 {
 	auto ics = n->getIndirectCallSites();
-	set<IPCallGraphNode*> s;
+	set<IPCallGraphNode*> s = allAT;
+	/*
 	for(auto f : globalATList)
 	{
 		auto node_iter = nodeMap.find(f);
@@ -752,7 +790,7 @@ void IPCallGraph::generateIndirectEdges(IPCallGraphNode* n)
 			node_f = (node_iter)->second;
 		s.insert(node_f);
 	}
-	
+	*/
 	auto cur_func = n->getFunction();
 	for(auto bl : CIter::children(cur_func))
 	{
@@ -2059,6 +2097,25 @@ void IPCallGraph::generate()
 	   
 	}
 	start = high_resolution_clock::now();
+	for(auto f : globalATList)
+        {
+                auto node_iter = nodeMap.find(f);
+                IPCallGraphNode* node_f;
+                if(node_iter == nodeMap.end())
+                {
+                        node_f = new IPCallGraphNode(f, listManager);
+                        df.getWorkingSet(f);
+                        LOG(15, f<<" "<<node_f<<" "<<std::hex<<f->getAddress()<<" "<<f->getName());
+                        nodeMap[f] = node_f;
+                }
+                else
+		{
+                        node_f = (node_iter)->second;
+		}
+
+                allAT.insert(node_f);
+        }
+
 	for(auto n : nodeMap)
 	{
 		generateIndirectEdges(n.second);

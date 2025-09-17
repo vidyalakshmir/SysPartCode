@@ -333,6 +333,8 @@ class IPCallGraph
 	std::map<std::tuple<int, Function*, Instruction*>, bool> handle_arg_cache;
 	int forwardDfAnalysisType=0;
 	ChildListManager listManager;
+	std::unordered_map<std::string, std::set<IPCallGraphNode*>> moduleToAT;
+	set<IPCallGraphNode*> allAT;
 	public:
 	map<Function*, IPCallGraphNode*> nodeMap;
 	void addFunctionRoot(Function* func);

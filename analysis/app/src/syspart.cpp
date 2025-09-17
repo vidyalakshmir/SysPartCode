@@ -1465,7 +1465,7 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
 		startfuncs.push_back(f);
 	    }
 	    else
-		    cout<<f<<" not found"<<endl;
+		    std::cerr<<f<<" not found"<<endl;
     }
     ip_callgraph.setProgram(program);
 
@@ -1504,7 +1504,7 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
 	    auto sys_node = getSysNode(st);
             if(sys_node == NULL)
             {
-                    cout<<"No system calls generated for "<<st->getName()<<endl;
+		    std::cerr<<"No system calls generated for "<<st->getName()<<endl;
 		    continue;
             }
             auto bs = (sys_node->syscall_info)[sys_node];

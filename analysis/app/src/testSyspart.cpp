@@ -117,9 +117,11 @@ int main(int argc, char *argv[])
       20. Print all functions of all modules \n \
       21. Prints the arguments to dlopen()  \n \
       22. Prints the arguments to dlsym() \n \
-      23. Prints the callgraph from a set of start functions \n \
+      23. Prints the callgraph from a set of start functions which are stored in a file and passed as argument to -s option \n \
       24. Prints the direct syscalls \n \
       25. Prints all functions with their addresses and modules \n \
+      26. Prints the disassembly of a function (args: functionname) \n \
+      27. Print the system calls reachable from a set of start functions which are stored in a file and passed as argument to -s option \n \
       "},
       { 0 } 
     }; 
@@ -495,7 +497,7 @@ int main(int argc, char *argv[])
 	    }
 	case 23 : 
 	    {
-            	sp.run15(direct_flag, icanalysisFlag, typearmorFlag);
+            	sp.run15(direct_flag, icanalysisFlag, typearmorFlag, 1); //for callgraph
                 break;
             }
 	case 24 : 
@@ -507,6 +509,23 @@ int main(int argc, char *argv[])
 	    {
 		sp.printAllFunctions();
 		break;
+	    }
+	case 26:
+	    {
+		    auto found = option_args.find(',');
+                    if(found == string::npos)
+                    {
+	                    cout<<"Args(func_name) required"<<endl;
+	                    break;
+	            }
+		    string func_name = option_args.substr(found+1);
+		    sp.printDisass(func_name);
+		    break;
+	    }
+	case 27:
+	    {
+		    sp.run15(direct_flag, icanalysisFlag, typearmorFlag, 2); //for syscalls
+		    break;
 	    }
         default : {
                     cout<<"\nInvalid option"<<endl;

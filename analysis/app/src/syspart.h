@@ -123,6 +123,7 @@ class Syspart
 		void printFunctions();
 		void printDlArgs(string dlname);
 		void printDirectSyscalls();
-		void run15(bool direct, bool icanalysisFlag, bool typearmorFlag);
+		void run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int option);
+		void printDisass(string fname);
 };
 #endif

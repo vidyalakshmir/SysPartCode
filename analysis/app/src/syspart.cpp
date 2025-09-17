@@ -329,6 +329,7 @@ void Syspart::findDerivedSyscalls1(Function* func)
     }while(updateFlag);
 }
 
+
 void Syspart::findDerivedSyscalls(Function* func)
 {
     int complexity=0;
@@ -396,6 +397,27 @@ void Syspart::findDerivedSyscalls(Function* func)
             }
         }
     }
+}
+
+void Syspart::printDisass(string fname)
+{
+        Function* func = NULL;
+        if(fname.compare(0, 2, "0x") == 0)
+        {
+                address_t faddr = (address_t)stol(fname, NULL, 16);
+                func = findFunctionByAddress(faddr);
+        }
+        else
+        {
+                func = findFunctionByName(fname);
+        }
+        if(func != NULL)
+        {
+                 cout<<"DISASSEMBLY OF "<<func->getName()<<endl;
+                 ChunkDumper dump;
+                 func->accept(&dump);
+        }
+        cout<<endl;
 }
 
 
@@ -1423,7 +1445,7 @@ void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
 }
 
 /**** PRINT CALLGRAPH ********/
-void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag)
+void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int option)
 { 
     std::ifstream inputFile(startFuncFile);
 
@@ -1433,13 +1455,17 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag)
 	    return;
     }
     string func_name;
+    vector<Function*> startfuncs;
     while(std::getline(inputFile, func_name))
     {
 	    auto f = findFunctionByName(func_name);
 	    if(f != NULL)
 	    {
 	    	ip_callgraph.addFunctionRoot(f);
+		startfuncs.push_back(f);
 	    }
+	    else
+		    cout<<f<<" not found"<<endl;
     }
     ip_callgraph.setProgram(program);
 
@@ -1455,8 +1481,46 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag)
     ip_callgraph.addNssEdges();
     finiFuncs = ip_callgraph.getFiniFuncs();
     initFuncs = ip_callgraph.getInitFuncs();
-    ip_callgraph.printCallGraphWithCallsites();
 
+    if(option == 1)		//Print callgraph
+    {
+	    ip_callgraph.printCallGraphWithCallsites();
+    	    //ip_callgraph.writeCallgraphToBinaryFile();
+            //ip_callgraph.buildCallgraphFromBinaryFile("callgraph.bin");
+    }
+    else if(option == 2) //Print syscalls
+    {
+    	findDirectSyscalls();
+    	auto start = high_resolution_clock::now();
+    	findDerived4();
+    	auto stop = high_resolution_clock::now();
+    	auto duration = duration_cast<seconds>(stop - start);
+    	std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+
+    	std::bitset<350> combined;
+    	start = high_resolution_clock::now();
+    	for(auto st : startfuncs)
+    	{
+	    auto sys_node = getSysNode(st);
+            if(sys_node == NULL)
+            {
+                    cout<<"No system calls generated for "<<st->getName()<<endl;
+		    continue;
+            }
+            auto bs = (sys_node->syscall_info)[sys_node];
+	    combined |= bs;
+    	}
+    	stop = high_resolution_clock::now();
+    	duration = duration_cast<seconds>(stop - start);
+    	std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+	for(int i=0; i<=combined.size(); i++)
+	{
+    		if(combined[i] == 1)
+		{
+        		cout<<system_calls[i]<<endl;
+	        }
+    	}
+    }
 }
 
 

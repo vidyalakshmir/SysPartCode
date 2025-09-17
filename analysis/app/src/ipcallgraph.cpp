@@ -31,6 +31,7 @@ using namespace std::chrono;
 #define D_ipcallgraph 20
 
 #include "log/log.h"
+#include "log/registry.h"
 
 
 void IPCallGraphNode::insertCallTarget(address_t iaddr, bool isDirect, IPCallGraphNode* t)		
@@ -1579,7 +1580,7 @@ void IPCallGraph::findATList(Function* f)
 			else if(auto li = dynamic_cast<LinkedInstruction *>(semantic))
 			{
 				auto link = li->getLink();
-				LOG(20, "linked instructin "<<instr->getAddress());
+				LOG(20, "linked instructin "<<std::hex<<instr->getAddress()<<" "<<f->getName()<<" "<<f->getAddress()<<" "<<(f->getParent()->getParent()->getName()));
 				LOG(20, "LINK TYPE " << typeid(*link).name());
 				if(!link)
 					continue;
@@ -1641,13 +1642,42 @@ void IPCallGraph::findATList(Function* f)
 				else if(DataSection *ds = dynamic_cast<DataSection *>(target))
 				{
 					LOG(20, "Refering a datasection "<<ds->getName());
+					//Skip instructions that write a value to a data address
+					//Eg: movq         %rcx, 0x5182b2f(%rip)
+
+					auto assembly = semantic->getAssembly();
+					auto operands = assembly->getAsmOperands()->getOperands();
+					if(assembly->getId() == X86_INS_MOV || assembly->getId() == X86_INS_CMP)
+					{
+						const auto &operands =  assembly->getAsmOperands()->getOperands();
+
+						if((operands[0].type == X86_OP_IMM || operands[0].type == X86_OP_REG) && operands[1].type == X86_OP_MEM)
+							{
+								/*LOG(1,"Skipping instruction "<<std::hex<<instr->getAddress()<< " as it is a mov of value to a data. No function address is loaded");
+								GroupRegistry::getInstance()->applySetting("chunk", 20);
+				                                GroupRegistry::getInstance()->applySetting("disasm", 20);
+                                			        InstrDumper instrdumper(instr->getAddress(), INT_MIN);
+				                                instr->getSemantic()->accept	(&instrdumper);
+                                				GroupRegistry::getInstance()->applySetting("chunk", -1);
+				                                GroupRegistry::getInstance()->applySetting("disasm", -1);
+								*/
+								continue;
+							}
+					}
 					set<address_t> visited;
 					auto mod = (Module*)f->getParent()->getParent(); 
              		auto it = find(modulesWithSymbols.begin(), modulesWithSymbols.end(), mod);
              		if(it != modulesWithSymbols.end())
              		{
              			LOG(20, "Parse data");
-             			
+				  /*
+        		          GroupRegistry::getInstance()->applySetting("chunk", 20);
+		                  GroupRegistry::getInstance()->applySetting("disasm", 20);
+	                          InstrDumper instrdumper(instr->getAddress(), INT_MIN);
+              			  instr->getSemantic()->accept(&instrdumper);
+			          GroupRegistry::getInstance()->applySetting("chunk", -1);
+                                  GroupRegistry::getInstance()->applySetting("disasm", -1);
+     			          */
 						parseData(mod, instr, f, ds, targetAddress, &visited);
              		}
 					else
@@ -1693,6 +1723,13 @@ void IPCallGraph::findATList(Function* f)
              		if(it != modulesWithSymbols.end())
              		{
              			LOG(20, "Parse data");
+				  /*GroupRegistry::getInstance()->applySetting("chunk", 20);
+		                  GroupRegistry::getInstance()->applySetting("disasm", 20);
+                		  InstrDumper instrdumper(instr->getAddress(), INT_MIN);
+		                  instr->getSemantic()->accept(&instrdumper);
+		                  GroupRegistry::getInstance()->applySetting("chunk", -1);
+		                  GroupRegistry::getInstance()->applySetting("disasm", -1);*/
+
              			
 						parseData(mod, instr, f, ds, targetAddress, &visited);
              		}

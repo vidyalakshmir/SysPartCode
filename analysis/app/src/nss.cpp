@@ -29,11 +29,20 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <regex>
+#include <unordered_set>
+#include <iostream>
+#include <filesystem>
 
 #include "conductor/filesystem.h"
 #include "nss.h"
 
-//#include "log.h"
+#undef DEBUG_GROUP
+#define DEBUG_GROUP nss
+#define D_nss 20
+
+#include "log/log.h"
+
 
 NSSFuncsPass::NSSFuncsPass() {
     setupFuncs();
@@ -51,7 +60,7 @@ void NSSFuncsPass::visit(Module *module) {
         std::map<std::string, std::vector<std::string>> libneeded;
         auto liblist = databaselibs[it->second];
         for (auto lib : liblist) {
-           // CLOG(1, "\tnss library needed: %s", lib.c_str());
+            CLOG(1, "\tnss library needed: %s", lib.c_str());
             libneeded[lib].push_back("_nss_" + lib + "_" + extsymb->getName());
         }
         struct info inf1;
@@ -155,6 +164,51 @@ void NSSFuncsPass::loadConf() {
     std::ifstream conf(ConductorFilesystem::getInstance()
                            ->transform("/etc/nsswitch.conf")
                            .c_str());
+    std::vector<std::string> searchPath;
+    const char *user_library_path = getenv("USER_LIBRARY_PATH");
+
+    if(user_library_path)
+    {
+	    std::stringstream ss(user_library_path);
+	    std::string each_path;
+
+	    while(std::getline(ss, each_path, ':'))
+	    {
+		    if(!each_path.empty())
+		    {
+			searchPath.push_back(each_path);
+	    	}
+    	    }
+     }
+
+    searchPath.push_back("/lib");
+    searchPath.push_back("/usr/lib");
+    searchPath.push_back("/lib64");
+    searchPath.push_back("/usr/lib64");
+    searchPath.push_back("/usr/local/musl/lib");
+    
+    std::unordered_set<std::string> nssModules;
+    std::regex nssPattern(R"(libnss_([A-Za-z0-9]+)(?:[-\.].*)?\.so(\.[0-9]+)*)");
+    for (const auto& dir : searchPath) {
+        if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir))
+            continue;
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
+            if (!entry.is_regular_file())
+                continue;
+
+            std::string filename = entry.path().filename().string();
+            std::smatch match;
+            if (std::regex_match(filename, match, nssPattern)) {
+                if (match.size() >= 2) {
+                    std::string module = match[1];
+                    nssModules.insert(module);
+                    LOG(1, "NSS Library Found: " << filename << "  (module: " << module << ")");
+                }
+            }
+        }
+    }
+
     std::string line;
     while (std::getline(conf, line)) {
         if (line.length() == 0 || line[0] == '#') continue;
@@ -173,8 +227,9 @@ void NSSFuncsPass::loadConf() {
         std::string lib;
         while (ss >> lib) {
             if (lib[0] == '[') continue;
-            if(lib == "compat" || lib == "dns" || lib == "files" || lib =="hesiod" || lib =="nis" || lib == "nisplus") //These are the libnss libraries provide in glibc-2.27
-                liblist.push_back(lib);
+	    if(nssModules.find(lib) != nssModules.end())
+		    liblist.push_back(lib);
+            
         }
     }
 }

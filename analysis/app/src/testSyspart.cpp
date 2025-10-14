@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
 
     CollapsePLTPass collapsePLT(egalito.getConductor());
     prog->accept(&collapsePLT);
-    
+    sp.populateSyscallMap(); 
 	Function *start_func = NULL;
 	if(isFile)
 	{

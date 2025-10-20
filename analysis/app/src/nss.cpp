@@ -203,7 +203,7 @@ void NSSFuncsPass::loadConf() {
                 if (match.size() >= 2) {
                     std::string module = match[1];
                     nssModules.insert(module);
-                    LOG(1, "NSS Library Found: " << filename << "  (module: " << module << ")");
+                    //LOG(1, "NSS Library Found: " << filename << "  (module: " << module << ")");
                 }
             }
         }

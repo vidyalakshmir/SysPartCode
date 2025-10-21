@@ -37,12 +37,6 @@
 #include "conductor/filesystem.h"
 #include "nss.h"
 
-#undef DEBUG_GROUP
-#define DEBUG_GROUP nss
-#define D_nss 20
-
-#include "log/log.h"
-
 
 NSSFuncsPass::NSSFuncsPass() {
     setupFuncs();
@@ -60,7 +54,7 @@ void NSSFuncsPass::visit(Module *module) {
         std::map<std::string, std::vector<std::string>> libneeded;
         auto liblist = databaselibs[it->second];
         for (auto lib : liblist) {
-            CLOG(1, "\tnss library needed: %s", lib.c_str());
+           // CLOG(1, "\tnss library needed: %s", lib.c_str());
             libneeded[lib].push_back("_nss_" + lib + "_" + extsymb->getName());
         }
         struct info inf1;
@@ -164,7 +158,8 @@ void NSSFuncsPass::loadConf() {
     std::ifstream conf(ConductorFilesystem::getInstance()
                            ->transform("/etc/nsswitch.conf")
                            .c_str());
-    std::vector<std::string> searchPath;
+    std::vector<std::string> userSearchPath;
+    std::vector<std::string> systemSearchPath;
     const char *user_library_path = getenv("USER_LIBRARY_PATH");
 
     if(user_library_path)
@@ -176,38 +171,62 @@ void NSSFuncsPass::loadConf() {
 	    {
 		    if(!each_path.empty())
 		    {
-			searchPath.push_back(each_path);
+			userSearchPath.push_back(each_path);
 	    	}
     	    }
      }
 
-    searchPath.push_back("/lib");
-    searchPath.push_back("/usr/lib");
-    searchPath.push_back("/lib64");
-    searchPath.push_back("/usr/lib64");
-    searchPath.push_back("/usr/local/musl/lib");
+    systemSearchPath.push_back("/lib/x86_64-linux-gnu");
+    systemSearchPath.push_back("/usr/lib");
+    systemSearchPath.push_back("/lib64");
+    systemSearchPath.push_back("/usr/lib64");
+    systemSearchPath.push_back("/usr/local/musl/lib");
     
     std::unordered_set<std::string> nssModules;
-    std::regex nssPattern(R"(libnss_([A-Za-z0-9]+)(?:[-\.].*)?\.so(\.[0-9]+)*)");
-    for (const auto& dir : searchPath) {
-        if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir))
-            continue;
+    auto searchForModules = [&](const std::vector<std::string>& paths) -> bool {
+	   bool found = false;
+	   std::regex nssPattern(R"(libnss_([A-Za-z0-9]+)(?:[-\.].*)?\.so(\.[0-9]+)*)");
+	   for (const auto& dir : paths) {
+	       if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir))
+        	   continue;
 
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
-            if (!entry.is_regular_file())
-                continue;
+	       for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
+        	   if (!entry.is_regular_file())
+                	continue;
+	
+	            std::string filename = entry.path().filename().string();
+        	    std::smatch match;
+	            if (std::regex_match(filename, match, nssPattern)) {
+        	        if (match.size() >= 2) {
+                	    std::string module = match[1];
+	                    nssModules.insert(module);
+        	            //cout<<"Found: " << entry << " " << filename << "  (module: " << module << ")"<<endl;
+			    found = true;
+                	}
+            	}
+        	}
+    	}
+	return found;
+	};
 
-            std::string filename = entry.path().filename().string();
-            std::smatch match;
-            if (std::regex_match(filename, match, nssPattern)) {
-                if (match.size() >= 2) {
-                    std::string module = match[1];
-                    nssModules.insert(module);
-                    //LOG(1, "NSS Library Found: " << filename << "  (module: " << module << ")");
-                }
-            }
-        }
+    bool foundInUserPath = false;
+    if (!userSearchPath.empty()) {
+        foundInUserPath = searchForModules(userSearchPath);
     }
+
+    bool foundInSystemPath = false;
+	if (!foundInUserPath) 
+	{
+
+	    for (const auto& path : systemSearchPath) 
+	    {
+        	if (searchForModules({path})) 
+		{
+	            foundInSystemPath = true;
+        	    break;
+	        }
+	    }	
+	}
 
     std::string line;
     while (std::getline(conf, line)) {
@@ -217,7 +236,6 @@ void NSSFuncsPass::loadConf() {
         std::string db;
         ss >> db;
         if (db.back() != ':') {
-            //LOG(1, "Unknown nsswitch.conf file format!");
             continue;
         }
 

@@ -23,6 +23,11 @@ void Syspart::setStartFunc(Function *func)
 	this->start_func = func;
 }
 
+void Syspart::setStartFuncFile(string file)
+{
+	this->startFuncFile = file;
+}
+
 void Syspart::setProgram(Program *program)
 {
 	this->program = program;
@@ -123,6 +128,39 @@ void Syspart::findDirectSyscallsOfModule(Module* m)
             }
         }
     }
+}
+
+void Syspart::printDirectSyscalls()
+{
+    for(auto m : CIter::children(program))
+    {	    
+    	for(auto f : CIter::functions(m))
+    	{
+	        FindSyscalls findSyscalls;
+        	f->accept(&findSyscalls);
+        	auto list = findSyscalls.getNumberMap();
+
+	        for(auto kv : list)
+        	{
+	            auto syscallValues = kv.second;
+        	    for(auto value : syscallValues)
+            	    {
+	                cout<<f->getName()<<" "<<std::hex<<f->getAddress()<<" "<<m->getName()<<" " <<system_calls[value]<<" "<<std::dec<<value<<"\n";
+        	    }
+        	}
+    	}
+    }
+}
+
+void Syspart::printAllFunctions()
+{
+	for(auto m : CIter::children(program))
+	{
+		for(auto f : CIter::functions(m))
+		{
+			cout<<f->getName()<<" "<<std::hex<<f->getAddress()<<" "<<m->getName()<<endl;
+		}
+	}
 }
 
 void Syspart::findCallGraphOfModule(Module* m)
@@ -1351,6 +1389,44 @@ void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
       
 }
 
+/**** PRINT CALLGRAPH ********/
+void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag)
+{ 
+    std::ifstream inputFile(startFuncFile);
+
+    if(!inputFile.is_open())
+    {
+	    cout<<"Could not open file "<<startFuncFile<<endl;
+	    return;
+    }
+    string func_name;
+    while(std::getline(inputFile, func_name))
+    {
+	    auto f = findFunctionByName(func_name);
+	    if(f != NULL)
+	    {
+	    	ip_callgraph.addFunctionRoot(f);
+	    }
+    }
+    ip_callgraph.setProgram(program);
+
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+    ip_callgraph.printCallGraphWithCallsites();
+
+}
+
+
 /****** PRINTS SYSCALLINFO OF a specific function or ALL FUNCTIONS ****/
 void Syspart::run2(bool direct, bool icanalysisFlag, bool typearmorFlag, string func_name)
 {
@@ -2285,7 +2361,7 @@ void Syspart::getArgumentValue(bool icanalysisFlag, bool typearmorFlag, string f
     //ip_callgraph.addNssEdges();
     SyspartUtility util(program, &ip_callgraph, 0);
     util.initialize();
-    vector<UDResult> res;
+    std::unordered_set<UDResult> res;
     util.getArgumentsPassedToFunction(func, reg , res);
 }
 
@@ -2318,13 +2394,13 @@ void Syspart::printDlArgs(string dlname)
     	initFuncs = ip_callgraph.getInitFuncs();
     	SyspartUtility util(program, &ip_callgraph, 0);
     	util.initialize();
-    	vector<UDResult> res;
 	int reg;
 	if(dlname == "dlopen")
 		reg = 7;
 	else if(dlname == "dlsym")
 		reg = 6;
-    	util.getArgumentsPassedToFunction(func, reg , res);
+    	std::unordered_set<UDResult> res;
+	util.getArgumentsPassedToFunction(func, reg , res);
 }
 
 

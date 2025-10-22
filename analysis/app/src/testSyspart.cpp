@@ -17,8 +17,10 @@ using namespace std::chrono;
 char *filename=NULL;
 char *func_name;
 char *func_addr;
+string start_func_file;
 bool funcFlag = false;
-bool isAddr = true;
+bool isAddr = false;
+bool isFile = false;
 bool typearmorFlag = false;
 string typearmorPath;
 bool icanalysisFlag = false;
@@ -38,11 +40,15 @@ static int parse_opt (int key, char *arg, struct argp_state *state)
         case 's': if(arg[0] == '0' && arg[1] == 'x')
                     {
                         func_addr = arg;
+			isAddr = true;
                         
                     }
-                  else
+                  else if(arg[0] == '/')
+		  {
+			  isFile = true;
+			  start_func_file = arg;
+		  }
                    {
-                        isAddr = false;
                         func_name = arg;
                        
                    }
@@ -110,10 +116,14 @@ int main(int argc, char *argv[])
       19. Prints if fork() and pthread() functions are invoked within the application \n \
       20. Print all functions of all modules \n \
       21. Prints the arguments to dlopen()  \n \
-      22. Prints the arguments to dlsym()" },
+      22. Prints the arguments to dlsym() \n \
+      23. Prints the callgraph from a set of start functions \n \
+      24. Prints the direct syscalls \n \
+      25. Prints all functions with their addresses and modules \n \
+      "},
       { 0 } 
     }; 
-    struct argp argp = { options, parse_opt }; 
+    struct argp argp = { options, parse_opt };  
     argp_parse (&argp, argc, argv, 0, 0, 0);
     if(filename == NULL)
     {
@@ -146,16 +156,21 @@ int main(int argc, char *argv[])
     prog->accept(&collapsePLT);
     
 	Function *start_func = NULL;
-	if(!isAddr)
+	if(isFile)
 	{
-		start_func = sp.findFunctionByName(func_name);
+		sp.setStartFuncFile(start_func_file);
 	}
-	else
+	else if(isAddr)
 	{
 		address_t address = (address_t)strtol(func_addr, NULL, 16); 
 		start_func = sp.findFunctionByAddress(address);
+  	        sp.setStartFunc(start_func);
 	}
-	sp.setStartFunc(start_func);
+	else
+	{
+		 start_func = sp.findFunctionByName(func_name);
+		 sp.setStartFunc(start_func);
+	}
 	if(typearmorFlag)
 		sp.setTypeArmorPath(typearmorPath);
     switch(option)
@@ -470,13 +485,28 @@ int main(int argc, char *argv[])
 	    }
 	case 21 :
 	    {
-		    sp.printDlArgs("dlopen@");
-		    break;
+		sp.printDlArgs("dlopen@");
+		break;
 	    }
 	case 22 :
 	    {
-		    sp.printDlArgs("dlsym@");
-		    break;
+		sp.printDlArgs("dlsym@");
+		break;
+	    }
+	case 23 : 
+	    {
+            	sp.run15(direct_flag, icanalysisFlag, typearmorFlag);
+                break;
+            }
+	case 24 : 
+	    {
+	        sp.printDirectSyscalls();
+                break;
+            }
+	case 25 : 
+	    {
+		sp.printAllFunctions();
+		break;
 	    }
         default : {
                     cout<<"\nInvalid option"<<endl;
@@ -486,7 +516,7 @@ int main(int argc, char *argv[])
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<seconds>(stop - start); 
-    //cout << "Time taken for the analysis: "<<std::dec<<duration.count() <<" seconds" << endl; 
+    std::cerr << "Time taken for the analysis: "<<std::dec<<duration.count() <<" seconds" << endl; 
     return 0;
 
 }

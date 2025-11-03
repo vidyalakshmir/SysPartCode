@@ -190,6 +190,13 @@ void IPCallGraph::addFunctionRoot(Function* func)
 	}
 	functionRootSet.insert(func);
 	functionRoots.push_back(func);
+	auto start_iter = nodeMap.find(func);
+	if(start_iter == nodeMap.end())
+	{
+		IPCallGraphNode* start_node = new IPCallGraphNode(func, listManager);
+		df.getWorkingSet(func);
+		nodeMap[func] = start_node;
+	}
 }
 
 void IPCallGraph::setRoot(Function* func)
@@ -197,6 +204,14 @@ void IPCallGraph::setRoot(Function* func)
 	startfunc = func;
 	functionRoots.push_back(func);
 	functionRootSet.insert(func);
+	auto start_iter = nodeMap.find(func);
+        if(start_iter == nodeMap.end())
+        {
+                IPCallGraphNode* start_node = new IPCallGraphNode(func, listManager);
+                df.getWorkingSet(func);
+                nodeMap[func] = start_node;
+        }
+
 }
 
 vector<Function*> IPCallGraph::getFiniFuncs()

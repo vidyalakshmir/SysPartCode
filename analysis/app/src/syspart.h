@@ -24,7 +24,7 @@ class Syspart
     		set<int> derived_syscalls;
     		set<int> all_syscalls;
     		int color;
-    		std::map<SysNode*,bitset<350>> syscall_info;   //All system calls from the function <Node,bitset>, where node is one among the children
+    		std::map<SysNode*,bitset<600>> syscall_info;   //All system calls from the function <Node,bitset>, where node is one among the children
     		std::map<Instruction *, std::set<unsigned long>> syscallMap;
 		};
 
@@ -76,7 +76,7 @@ class Syspart
 		void findDerivedSyscalls3(Function *func);
 		void findDerived4();
 
-		bitset<350> buildSysCallTree(IPCallGraphNode *n, bool *flag);
+		bitset<600> buildSysCallTree(IPCallGraphNode *n, bool *flag);
 		void getSyscallInfo(Function *func);
 		SysNode* getSysNode(Function *f);
 		set<int> findSyscallsAccessible(address_t addr, Function* f);

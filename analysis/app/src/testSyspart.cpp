@@ -538,6 +538,7 @@ int main(int argc, char *argv[])
 	case 28:
 	    {
 		    sp.run16(direct_flag, icanalysisFlag, typearmorFlag, 2);
+		    break;
 	    }
         default : {
                     cout<<"\nInvalid option"<<endl;

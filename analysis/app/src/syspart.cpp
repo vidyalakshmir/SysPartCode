@@ -286,13 +286,13 @@ void Syspart::findDirectSyscalls()
 		auto f = i.first;
 		auto ip_node = i.second;
 		SysNode *s = new SysNode;
-
+		//cout<<"Created node for "<<f->getName()<<endl;
 		FindSyscalls findSyscalls;
     	f->accept(&findSyscalls);
         auto list = findSyscalls.getNumberMap();
         s->syscallMap = list;
         s->func = f;
-        bitset<350> bs;   //initialized with zero;
+        bitset<600> bs;   //initialized with zero;
         for(auto kv : list)
         {
             auto syscallValues = kv.second;
@@ -453,8 +453,8 @@ void Syspart::findDerivedSyscalls(Function* func)
                 auto bitset_it = (sys_node->syscall_info).find(sys_child);
                 if(bitset_it == (sys_node->syscall_info).end())
                 {
-                    string bs_string(350,'0');
-                    bitset<350> bs(bs_string);
+                    string bs_string(600,'0');
+                    bitset<600> bs(bs_string);
                     bs.set(sysno);
                     (sys_node->syscall_info)[sys_child] = bs;
                 }
@@ -510,7 +510,7 @@ void Syspart::findDerived4()
 			if(cur_iter == syscall_mapping.end())
 				continue;
 			auto cur_sys_node = cur_iter->second;
-			std::bitset<350> current_syscalls = (cur_sys_node->syscall_info)[cur_sys_node];
+			std::bitset<600> current_syscalls = (cur_sys_node->syscall_info)[cur_sys_node];
 			//cout<<(i.first)->getName()<<" "<<current_syscalls.to_string()<<endl;
 			for(auto child : cur_node->getAllCallTargets())
 			{
@@ -557,14 +557,14 @@ void Syspart::findDerivedSyscalls3(Function* func)
     for(auto s : syscall_mapping)
     {
         auto sysnode = s.second;
-        string bs_string(350,'0');
-        bitset<350> bs(bs_string);
+        string bs_string(600,'0');
+        bitset<600> bs(bs_string);
         for(auto ss : sysnode->syscall_info)
         {
             if(sysnode != ss.first)
                 bs |= ss.second;
         }
-        for(int i=0; i<350; i++)
+        for(int i=0; i<600; i++)
         {
             if(bs.test(i))
                 sysnode->derived_syscalls.insert(i);
@@ -573,7 +573,7 @@ void Syspart::findDerivedSyscalls3(Function* func)
 
 }
 
-bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
+bitset<600> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
 {
 	auto iter = syscall_mapping.find(ip_node);
   	if(iter == syscall_mapping.end())
@@ -595,8 +595,8 @@ bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
     //cout<<build_recursion<<n->name<<" "<<build_count<<endl;
     build_count++;
     cout<<build_count<<endl;
-    bitset<350> bsFinal = (n->syscall_info)[n];
-    string bs_init_string(350,'0');
+    bitset<600> bsFinal = (n->syscall_info)[n];
+    string bs_init_string(600,'0');
     for(auto child : children)    //Loop to get the all the system calls of its children
     {
         
@@ -610,7 +610,7 @@ bitset<350> Syspart::buildSysCallTree(IPCallGraphNode* ip_node, bool *flag)
         auto mapIter = (n->syscall_info).find(child_node);
 
         
-        bitset<350> bs(bs_init_string);
+        bitset<600> bs(bs_init_string);
         if(mapIter != (n->syscall_info).end())  //contains
         {
             bs = mapIter->second;
@@ -1525,6 +1525,7 @@ void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
             for(auto func : CIter::functions(module))
             {
 		    ip_callgraph.addFunctionRoot(func);
+		    //cout<<"Adding "<<func->getName()<<endl;
 		    allfuncs.push_back(func);
             }
         }
@@ -1559,7 +1560,7 @@ void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
         auto duration = duration_cast<seconds>(stop - start);
         std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
 
-        std::bitset<350> combined;
+        std::bitset<600> combined;
         start = high_resolution_clock::now();
         for(auto st : allfuncs)
         {
@@ -1640,7 +1641,7 @@ void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int op
     	auto duration = duration_cast<seconds>(stop - start);
     	std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
 
-    	std::bitset<350> combined;
+    	std::bitset<600> combined;
     	start = high_resolution_clock::now();
     	for(auto st : startfuncs)
     	{

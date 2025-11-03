@@ -127,5 +127,6 @@ class Syspart
 		void printDirectSyscalls();
 		void run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int option);
 		void printDisass(string fname);
+		void run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int option);
 };
 #endif

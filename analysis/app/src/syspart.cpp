@@ -1517,6 +1517,77 @@ void Syspart::run1(bool direct, bool icanalysisFlag, bool typearmorFlag)
 }
 
 /**** PRINT CALLGRAPH ********/
+void Syspart::run16(bool direct, bool icanalysisFlag, bool typearmorFlag, int option)
+{
+    vector<Function*> allfuncs;
+    for(auto module : CIter::children(program))
+        {
+            for(auto func : CIter::functions(module))
+            {
+		    ip_callgraph.addFunctionRoot(func);
+		    allfuncs.push_back(func);
+            }
+        }
+
+    ip_callgraph.setProgram(program);
+
+    ip_callgraph.resolveNss(setup);
+    ip_callgraph.setIcanalysis(icanalysisFlag);
+    ip_callgraph.setTypeArmor(typearmorFlag);
+    if(typearmorFlag)
+        ip_callgraph.setTypeArmorPath(typearmorPath);
+    if(direct)
+        ip_callgraph.generateDirectCallGraph();
+    else
+       ip_callgraph.generate();
+    ip_callgraph.addNssEdges();
+    finiFuncs = ip_callgraph.getFiniFuncs();
+    initFuncs = ip_callgraph.getInitFuncs();
+
+    if(option == 1)             //Print callgraph
+    {
+            ip_callgraph.printCallGraphWithCallsites();
+            //ip_callgraph.writeCallgraphToBinaryFile();
+            //ip_callgraph.buildCallgraphFromBinaryFile("callgraph.bin");
+    }
+    else if(option == 2) //Print syscalls
+    {
+        findDirectSyscalls();
+        auto start = high_resolution_clock::now();
+	findDerived4();
+        auto stop = high_resolution_clock::now();
+        auto duration = duration_cast<seconds>(stop - start);
+        std::cerr << "Derived syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+
+        std::bitset<350> combined;
+        start = high_resolution_clock::now();
+        for(auto st : allfuncs)
+        {
+            auto sys_node = getSysNode(st);
+            if(sys_node == NULL)
+            {
+                    std::cerr<<"No system calls generated for "<<st->getName()<<endl;
+                    continue;
+            }
+            auto bs = (sys_node->syscall_info)[sys_node];
+            combined |= bs;
+        }
+        stop = high_resolution_clock::now();
+        duration = duration_cast<seconds>(stop - start);
+        std::cerr << "Combined syscalls generation: "<<std::dec<<duration.count() <<" seconds" << endl;
+        for(int i=0; i<=combined.size(); i++)
+        {
+                if(combined[i] == 1)
+                {
+                        cout<<system_calls[i]<<endl;
+                }
+        }
+    }
+}
+
+
+
+/**** PRINT CALLGRAPH ********/
 void Syspart::run15(bool direct, bool icanalysisFlag, bool typearmorFlag, int option)
 { 
     std::ifstream inputFile(startFuncFile);

@@ -29,6 +29,7 @@ bool direct_flag = false;
 int option;
 string option_args;
 bool option_flag = false;
+bool allFlag = false;
 
 static int parse_opt (int key, char *arg, struct argp_state *state) 
 { 
@@ -37,7 +38,12 @@ static int parse_opt (int key, char *arg, struct argp_state *state)
         case 'p':  
                   filename = arg;
                   break; 
-        case 's': if(arg[0] == '0' && arg[1] == 'x')
+        case 's': 
+		  if(arg == "all")
+		  {
+			  allFlag = true;
+		  }
+		  else if(arg[0] == '0' && arg[1] == 'x')
                     {
                         func_addr = arg;
 			isAddr = true;
@@ -48,6 +54,7 @@ static int parse_opt (int key, char *arg, struct argp_state *state)
 			  isFile = true;
 			  start_func_file = arg;
 		  }
+		  else
                    {
                         func_name = arg;
                        
@@ -122,6 +129,7 @@ int main(int argc, char *argv[])
       25. Prints all functions with their addresses and modules \n \
       26. Prints the disassembly of a function (args: functionname) \n \
       27. Print the system calls reachable from a set of start functions which are stored in a file and passed as argument to -s option \n \
+      28. Prints the system calls reachable from all functions in the binary and libraries \n \
       "},
       { 0 } 
     }; 
@@ -168,7 +176,7 @@ int main(int argc, char *argv[])
 		start_func = sp.findFunctionByAddress(address);
   	        sp.setStartFunc(start_func);
 	}
-	else
+	else if(!allFlag)
 	{
 		 start_func = sp.findFunctionByName(func_name);
 		 sp.setStartFunc(start_func);
@@ -526,6 +534,10 @@ int main(int argc, char *argv[])
 	    {
 		    sp.run15(direct_flag, icanalysisFlag, typearmorFlag, 2); //for syscalls
 		    break;
+	    }
+	case 28:
+	    {
+		    sp.run16(direct_flag, icanalysisFlag, typearmorFlag, 2);
 	    }
         default : {
                     cout<<"\nInvalid option"<<endl;
